@@ -40,9 +40,12 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 ## Publication et installation par Homebrew Channel
 - Publier : `gh auth login` avec le compte propriétaire, puis `bash scripts/app/publish.sh <compte> <dépôt>` (option `--dry-run` pour simuler). Le script construit le paquet propre (sans photos, icônes ni données), génère `repo/index.json` et le manifeste, pousse le dépôt et crée la release avec le `.ipk`.
 - Sur la TV : Homebrew Channel > Réglages > Add repository, URL `https://raw.githubusercontent.com/<compte>/<dépôt>/main/repo/index.json` (ou `ares-launch org.webosbrew.hbchannel -p '{"launchMode":"addRepository","url":"…"}'` pour pré-remplir le champ). L'app ApOS apparaît dans la liste ; INSTALL ou UPDATE.
-- Mise à jour : augmenter `version` dans `app/appinfo.json` (et `VERSION` dans `app/js/main.js`), relancer `publish.sh` ; Homebrew Channel propose UPDATE.
+- Mise à jour : augmenter `version` dans `app/appinfo.json`, relancer `bash scripts/app/publish.sh B4b4j1 apos` (compte `gh` actif : `B4b4j1`). Homebrew Channel propose UPDATE, et ApOS lui-même : Réglages > Mise à jour > Rechercher, puis Installer (le service de la TV télécharge le `.ipk` depuis ce dépôt, vérifie son SHA-256 et l'installe ; vérification uniquement à la demande, rien n'est envoyé). Le service lui-même (`apos_screentime.py`) n'est pas dans le paquet : après une évolution du service, relancer `scripts/device/install-screentime.sh <ip-tv>`.
 - Une mise à jour remplace le dossier de l'app : le service de temps d'écran restaure ensuite, depuis `/var/lib/webosbrew/apos`, les photos, les icônes, la liste des apps et l'historique (dans la minute). Relancer ApOS pour les voir. Remplir cette copie : `scripts/device/sync-assets.sh <ip-tv>` (photos et icônes locales) ou `refresh-apps.sh`.
 - Première installation sur une TV vierge : installer le paquet, puis `install-screentime.sh`, `apply-hosts-block.sh`, `refresh-apps.sh`, `sync-assets.sh`.
+
+## Licence
+MIT, voir `LICENSE`. Notices tierces : `THIRD_PARTY_NOTICES.md`.
 
 ## Tests
 - Python : `build/venv/bin/python -m pytest tools blocklist scripts` (venv à créer dans `build/` avec pytest et pillow)

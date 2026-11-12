@@ -5,8 +5,9 @@
   au premier plan dans data/usage-AAAA-MM-JJ.log (« HH:MM:SS idApp »). Les jours passés sont résumés en .tsv.
 - Limites : limite quotidienne et limites par app. À la limite : un message (toast) ou un verrouillage
   (ApOS est ramené au premier plan et affiche un écran de code PIN). Le code PIN prolonge d'une durée choisie.
-- API locale : http://127.0.0.1:8742 (GET /state, POST /config /pin /verify /unlock /ack), réservée à la TV.
-Aucune donnée ne quitte la TV.
+- API locale : http://127.0.0.1:8742 (GET /state, POST /config /pin /verify /unlock /ack /update/check /update/install), réservée à la TV.
+Aucune donnée ne quitte la TV ; seule exception : la vérification de mise à jour demandée par l'utilisateur
+(téléchargement depuis le dépôt GitHub d'ApOS, rien n'est envoyé).
 """
 import hashlib
 import hmac
@@ -18,6 +19,7 @@ import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -35,6 +37,92 @@ PBKDF2_ROUNDS = 50000
 ASSET_PATHS = ("assets/wallpapers", "assets/icons", "config/launchpoints.json")
 RESTORE_EVERY_SECONDS = 60
 BACKUP_EVERY_SECONDS = 300
+# Mise à jour : uniquement à la demande de l'utilisateur, depuis ce dépôt (adresse fixe, jamais fournie par l'API).
+UPDATE_INDEX_URL = "https://raw.githubusercontent.com/B4b4j1/apos/main/repo/index.json"
+MAX_IPK_BYTES = 20 * 1024 * 1024
+VERSION_FORMAT = re.compile(r"^[0-9]{1,4}\.[0-9]{1,4}\.[0-9]{1,4}$")
+
+
+def version_tuple(value):
+    if not isinstance(value, str) or not VERSION_FORMAT.match(value):
+        raise ValueError("version invalide")
+    return tuple(int(x) for x in value.split("."))
+
+
+def http_get(url, limit):
+    if not url.startswith("https://"):
+        raise ValueError("adresse non HTTPS")
+    with urllib.request.urlopen(url, timeout=30) as response:
+        data = response.read(limit + 1)
+    if len(data) > limit:
+        raise ValueError("réponse trop grande")
+    return data
+
+
+class Updater:
+    """Compare la version installée à l'index publié et installe le .ipk (hash SHA-256 vérifié)."""
+
+    def __init__(self, app_dir, index_url, get, luna_fn, tmp_dir):
+        self.app_dir, self.index_url, self.get, self.luna, self.tmp_dir = app_dir, index_url, get, luna_fn, tmp_dir
+        self.last = None
+        self.lock = threading.Lock()
+
+    def status(self):
+        return self.last
+
+    def _installed(self):
+        with open(os.path.join(self.app_dir, "appinfo.json")) as f:
+            return json.load(f)["version"]
+
+    def _package(self):
+        index = json.loads(self.get(self.index_url, 1024 * 1024).decode())
+        for pkg in index.get("packages", []):
+            if pkg.get("id") == APOS_ID:
+                version_tuple(pkg.get("version"))
+                url = pkg.get("ipkUrl")
+                sha = (pkg.get("ipkHash") or {}).get("sha256")
+                if not (isinstance(url, str) and url.startswith("https://") and isinstance(sha, str) and re.match(r"^[0-9a-f]{64}$", sha)):
+                    raise ValueError("index invalide")
+                return pkg
+        raise ValueError("index invalide")
+
+    def check(self):
+        with self.lock:
+            result = {"current": "", "latest": "", "available": False, "error": ""}
+            try:
+                result["current"] = self._installed()
+                pkg = self._package()
+                result["latest"] = pkg["version"]
+                result["available"] = version_tuple(pkg["version"]) > version_tuple(result["current"])
+            except ValueError:
+                result["error"] = "index invalide"
+            except (OSError, KeyError):
+                result["error"] = "dépôt injoignable"
+            self.last = result
+            return result
+
+    def install(self):
+        result = self.check()
+        if result["error"]:
+            raise ValueError(result["error"])
+        if not result["available"]:
+            raise ValueError("ApOS est déjà à jour")
+        with self.lock:
+            try:
+                pkg = self._package()
+                data = self.get(pkg["ipkUrl"], MAX_IPK_BYTES)
+            except (OSError, KeyError):
+                raise ValueError("téléchargement impossible")
+            if hashlib.sha256(data).hexdigest() != pkg["ipkHash"]["sha256"]:
+                raise ValueError("échec du contrôle d'intégrité")
+            os.makedirs(self.tmp_dir, exist_ok=True)
+            path = os.path.join(self.tmp_dir, "apos-update.ipk")
+            with open(path, "wb") as f:
+                f.write(data)
+            res = self.luna("luna://com.webos.appInstallService/dev/install", {"id": "apos-update", "ipkUrl": path, "subscribe": False})
+            if not (isinstance(res, dict) and res.get("returnValue") is not False):
+                raise ValueError("installation refusée")
+            return True
 
 
 def luna(uri, params, timeout=5):
@@ -112,7 +200,8 @@ def write_json(path, data):
 
 
 class Service:
-    def __init__(self, data_dir, config_path, luna_fn, now, interval=10, state_path=None, app_dir=None, persist_dir=None):
+    def __init__(self, data_dir, config_path, luna_fn, now, interval=10, state_path=None, app_dir=None, persist_dir=None, updater=None):
+        self.updater = updater
         self.app_dir = app_dir
         self.persist_dir = persist_dir
         self.data_dir = data_dir
@@ -307,6 +396,7 @@ class Service:
                 "has_pin": bool(self.config["pin_hash"]), "over_limit": status["over"], "locked": locked,
                 "reason": status["reason"], "app": status["app"], "allowed": status["allowed"],
                 "action": self.config["action"],
+                "update": self.updater.status() if self.updater else None,
             }
 
     # ---------- code PIN et configuration ----------
@@ -427,6 +517,11 @@ def make_server(service, host="127.0.0.1", port=PORT):
                     self._send(200, {"ok": service.verify(body.get("pin"))})
                 elif self.path == "/unlock":
                     self._send(200, {"ok": service.unlock(body.get("pin"))})
+                elif self.path == "/update/check" and service.updater:
+                    self._send(200, service.updater.check())
+                elif self.path == "/update/install" and service.updater:
+                    service.updater.install()
+                    self._send(200, {"ok": True})
                 elif self.path == "/ack":
                     service.acknowledge()
                     self._send(200, {"ok": True})
@@ -451,7 +546,8 @@ def main():
     interval = int(os.environ.get("APOS_INTERVAL", "10"))
     app_dir = os.path.dirname(data_dir.rstrip("/"))
     persist = os.environ.get("APOS_PERSIST", "/var/lib/webosbrew/apos")
-    service = Service(data_dir, config, luna, datetime.now, interval, app_dir=app_dir, persist_dir=persist)
+    updater = Updater(app_dir, UPDATE_INDEX_URL, http_get, luna, "/tmp/apos-update")
+    service = Service(data_dir, config, luna, datetime.now, interval, app_dir=app_dir, persist_dir=persist, updater=updater)
     server = make_server(service)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     last_restore = last_backup = time.time()

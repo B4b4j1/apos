@@ -390,3 +390,112 @@ def test_restored_raw_logs_are_skipped_when_a_summary_already_exists():
         svc, app, _ = make_persist(tmp)
         assert not os.path.exists(os.path.join(app, "data", "usage-2026-11-01.log"))
         assert os.path.exists(os.path.join(app, "data", "usage-2026-11-01.tsv"))
+
+
+# ---------- mise à jour depuis le dépôt GitHub ----------
+
+import hashlib  # noqa: E402
+
+
+def make_updater(tmp_path, current="0.2.0", index=None, ipk=b"IPKDATA", luna=None):
+    app = os.path.join(tmp_path, "app")
+    os.makedirs(app)
+    with open(os.path.join(app, "appinfo.json"), "w") as f:
+        json.dump({"id": "com.apos.launcher", "version": current}, f)
+    pkg = {"id": "com.apos.launcher", "version": "0.3.0", "ipkUrl": "https://example.test/a.ipk",
+           "ipkHash": {"sha256": hashlib.sha256(ipk).hexdigest()}}
+    if index is not None:
+        pkg.update(index)
+    fetched = []
+
+    def get(url, limit):
+        fetched.append(url)
+        if url.endswith("index.json"):
+            return json.dumps({"packages": [pkg]}).encode()
+        return ipk
+
+    luna = luna or FakeLuna()
+    up = s.Updater(app, "https://example.test/index.json", get, luna, os.path.join(tmp_path, "tmp"))
+    return up, luna, fetched
+
+
+def test_version_tuple_orders_and_rejects_garbage():
+    assert s.version_tuple("0.10.0") > s.version_tuple("0.9.9")
+    for bad in ("", "x", "1.2", "1.2.3.4", "1.2.-3"):
+        try:
+            s.version_tuple(bad)
+            assert False, bad
+        except ValueError:
+            pass
+
+
+def test_check_reports_newer_version(tmp_path):
+    up, _, _ = make_updater(str(tmp_path))
+    r = up.check()
+    assert r == {"current": "0.2.0", "latest": "0.3.0", "available": True, "error": ""}
+    assert up.status() == r
+
+
+def test_check_same_or_older_is_not_available(tmp_path):
+    up, _, _ = make_updater(str(tmp_path), current="0.3.0")
+    assert up.check()["available"] is False
+    up, _, _ = make_updater(str(tmp_path / "b"), current="9.0.0")
+    assert up.check()["available"] is False
+
+
+def test_check_network_failure_is_reported_not_raised(tmp_path):
+    up, _, _ = make_updater(str(tmp_path))
+    up.get = lambda url, limit: (_ for _ in ()).throw(OSError("down"))
+    r = up.check()
+    assert r["available"] is False and r["error"] == "dépôt injoignable"
+
+
+def test_check_rejects_non_https_ipk_and_bad_index(tmp_path):
+    up, _, _ = make_updater(str(tmp_path), index={"ipkUrl": "http://example.test/a.ipk"})
+    assert up.check()["error"] == "index invalide"
+    up, _, _ = make_updater(str(tmp_path / "b"), index={"version": "abc"})
+    assert up.check()["error"] == "index invalide"
+
+
+def test_install_downloads_verifies_and_calls_installer(tmp_path):
+    up, luna, fetched = make_updater(str(tmp_path))
+    assert up.install() is True
+    uri, params = luna.calls[-1]
+    assert uri == "luna://com.webos.appInstallService/dev/install"
+    assert params["ipkUrl"].endswith(".ipk") and os.path.exists(params["ipkUrl"])
+    with open(params["ipkUrl"], "rb") as f:
+        assert f.read() == b"IPKDATA"
+    assert fetched[-1] == "https://example.test/a.ipk"
+
+
+def test_install_refuses_bad_hash_and_up_to_date(tmp_path):
+    up, luna, _ = make_updater(str(tmp_path), index={"ipkHash": {"sha256": "0" * 64}})
+    try:
+        up.install()
+        assert False
+    except ValueError as err:
+        assert "contrôle d'intégrité" in str(err)
+    assert luna.calls == []
+    up, luna, _ = make_updater(str(tmp_path / "b"), current="0.3.0")
+    try:
+        up.install()
+        assert False
+    except ValueError as err:
+        assert "à jour" in str(err)
+    assert luna.calls == []
+
+
+def test_http_update_endpoints(tmp_path):
+    up, luna, _ = make_updater(str(tmp_path))
+    svc, _, _ = make(str(tmp_path / "svc"))
+    svc.updater = up
+    server, base = start_server(svc)
+    try:
+        assert call(base, "GET", "/state")[1]["update"] is None
+        status, body, _ = call(base, "POST", "/update/check", {})
+        assert status == 200 and body["available"] is True and body["latest"] == "0.3.0"
+        assert call(base, "GET", "/state")[1]["update"]["latest"] == "0.3.0"
+        assert call(base, "POST", "/update/install", {})[0] == 200
+        assert luna.calls[-1][0].endswith("/dev/install")
+    finally:
+        server.shutdown()

@@ -18,6 +18,7 @@ import { iconSvg } from "./icons.js";
 import { loadDay, loadDays, loadRange, loadInterval, totalSeconds, sortedUsage, formatDuration, appTitle } from "./screentime.js";
 import { createApi, API_BASE } from "./api.js";
 import { chartBars, shortDuration } from "./chart.js";
+import { updateSummary, installErrorMessage } from "./update.js";
 import { DAILY_CHOICES, APP_CHOICES, EXTENSION_CHOICES, ACTION_CHOICES, limitLabel, lockMessage, pinPress } from "./limits.js";
 
 const LONG_PRESS_MS = 700; // maintien de OK : mode réorganisation
@@ -92,6 +93,11 @@ export function render(root, catalog, env) {
   let limitState = null; // état du service de temps d'écran (null = injoignable)
   let pinOkAt = 0; // dernier code PIN validé pour les réglages (valable 5 min)
   let lastPin = "";
+  let appVersion = "";
+  let updateBusy = "";
+  if (!opts.noVersion) {
+    fetch("appinfo.json").then((r) => r.json()).then((j) => { appVersion = String(j.version || ""); }).catch(() => {});
+  }
 
   const top = () => stack[stack.length - 1];
   const onHome = () => stack.length === 1;
@@ -521,6 +527,40 @@ export function render(root, catalog, env) {
     return { kind: "list", title: "Système", preview: { icon: "system", text: "Réglages officiels de la TV et informations." }, rows };
   }
 
+  function updateView() {
+    const st = limitState;
+    const sum = updateSummary(st ? st.update : null);
+    const rows = [{ label: "Version installée", value: appVersion || "?", icon: "system", desc: "Version d'ApOS actuellement sur la TV.", onSelect: () => {} }];
+    if (!st) {
+      rows.push({ label: "Rechercher une mise à jour", value: "Service arrêté", icon: "system", desc: "Le service ApOS de la TV ne répond pas.", onSelect: () => {} });
+    } else {
+      rows.push({ label: "Rechercher une mise à jour", value: updateBusy || sum.value, icon: "system",
+        desc: "Interroge le dépôt GitHub d'ApOS. Rien n'est envoyé, aucune vérification automatique.",
+        onSelect: () => {
+          updateBusy = "Vérification…"; show();
+          api.post("/update/check", {}).then((res) => {
+            updateBusy = "";
+            if (res.status === 0) say("Service injoignable.");
+            return api.state().then((s) => { limitState = s; show(); });
+          });
+        } });
+      if (sum.available) {
+        rows.push({ label: "Installer la version " + st.update.latest, icon: "system",
+          desc: "Télécharge, vérifie l'empreinte SHA-256 puis installe. Vos photos et réglages sont conservés.",
+          onSelect: () => {
+            updateBusy = "Installation en cours…"; show();
+            api.post("/update/install", {}).then((res) => {
+              updateBusy = res.status === 200 ? "Installée : relancez ApOS" : "";
+              if (res.status !== 200) say(installErrorMessage(res.status));
+              show();
+            });
+          } });
+      }
+    }
+    rows.push({ label: "Ouvrir Homebrew Channel", icon: "apps", desc: "Pour installer ou mettre à jour manuellement.", onSelect: launchEntry("org.webosbrew.hbchannel") });
+    return { kind: "list", title: "Mise à jour", preview: { icon: "system", text: "Mettez ApOS à jour depuis le dépôt GitHub." }, rows };
+  }
+
   function settingsRootView() {
     const g = (id) => GROUPS.filter((x) => x.id === id)[0];
     const rows = [
@@ -530,6 +570,7 @@ export function render(root, catalog, env) {
       { label: "Horloge", chevron: true, icon: "clock", desc: g("clock").description, onSelect: () => push(() => groupView(g("clock"))) },
       { label: "Apparence", chevron: true, icon: "appearance", desc: g("appearance").description, onSelect: () => push(() => groupView(g("appearance"))) },
       { label: "Système", chevron: true, icon: "system", desc: "Réglages LG, accueil LG, à propos.", onSelect: () => push(systemView) },
+      { label: "Mise à jour", chevron: true, icon: "system", desc: "Rechercher et installer une nouvelle version d'ApOS.", onSelect: () => push(updateView) },
     ];
     return { kind: "list", title: "Réglages", preview: { icon: "sliders", text: "Personnalisez ApOS." }, rows };
   }
