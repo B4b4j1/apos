@@ -37,6 +37,13 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 ## Liste des apps (launcher)
 - Une app web ne peut pas lister les apps via Luna. `bash scripts/device/refresh-apps.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin) génère sur la TV `config/launchpoints.json`, copie les icônes et calcule la couleur de tuile de chaque app (sur le Mac, avec Pillow). À relancer après l'ajout ou la suppression d'une app, ou après une réinstallation d'ApOS.
 
+## Publication et installation par Homebrew Channel
+- Publier : `gh auth login` avec le compte propriétaire, puis `bash scripts/app/publish.sh <compte> <dépôt>` (option `--dry-run` pour simuler). Le script construit le paquet propre (sans photos, icônes ni données), génère `repo/index.json` et le manifeste, pousse le dépôt et crée la release avec le `.ipk`.
+- Sur la TV : Homebrew Channel > Réglages > Add repository, URL `https://raw.githubusercontent.com/<compte>/<dépôt>/main/repo/index.json` (ou `ares-launch org.webosbrew.hbchannel -p '{"launchMode":"addRepository","url":"…"}'` pour pré-remplir le champ). L'app ApOS apparaît dans la liste ; INSTALL ou UPDATE.
+- Mise à jour : augmenter `version` dans `app/appinfo.json` (et `VERSION` dans `app/js/main.js`), relancer `publish.sh` ; Homebrew Channel propose UPDATE.
+- Une mise à jour remplace le dossier de l'app : le service de temps d'écran restaure ensuite, depuis `/var/lib/webosbrew/apos`, les photos, les icônes, la liste des apps et l'historique (dans la minute). Relancer ApOS pour les voir. Remplir cette copie : `scripts/device/sync-assets.sh <ip-tv>` (photos et icônes locales) ou `refresh-apps.sh`.
+- Première installation sur une TV vierge : installer le paquet, puis `install-screentime.sh`, `apply-hosts-block.sh`, `refresh-apps.sh`, `sync-assets.sh`.
+
 ## Tests
 - Python : `build/venv/bin/python -m pytest tools blocklist scripts` (venv à créer dans `build/` avec pytest et pillow)
 - JavaScript : `npm test`

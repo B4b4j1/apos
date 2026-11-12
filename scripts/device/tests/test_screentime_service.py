@@ -334,3 +334,59 @@ def test_http_is_bound_to_localhost_only():
             assert server.server_address[0] == "127.0.0.1"
         finally:
             server.shutdown()
+
+
+# ---------- persistance (survit à une mise à jour d'ApOS par Homebrew Channel) ----------
+
+def make_persist(tmp, **kw):
+    app = os.path.join(tmp, "app")
+    persist = os.path.join(tmp, "persist")
+    os.makedirs(app, exist_ok=True)
+    luna = FakeLuna(**kw)
+    clock = Clock(datetime(2026, 11, 12, 10, 0, 0))
+    svc = s.Service(os.path.join(app, "data"), os.path.join(tmp, "config.json"), luna, clock, 10,
+                    app_dir=app, persist_dir=persist)
+    return svc, app, persist
+
+
+def test_restore_assets_copies_missing_files_but_never_overwrites():
+    with tempfile.TemporaryDirectory() as tmp:
+        persist = os.path.join(tmp, "persist")
+        os.makedirs(os.path.join(persist, "assets", "wallpapers"))
+        os.makedirs(os.path.join(persist, "assets", "icons"))
+        os.makedirs(os.path.join(persist, "config"))
+        open(os.path.join(persist, "assets", "wallpapers", "wp-01.jpg"), "w").write("photo")
+        open(os.path.join(persist, "assets", "icons", "a.png"), "w").write("icone")
+        open(os.path.join(persist, "config", "launchpoints.json"), "w").write("{}")
+        svc, app, _ = make_persist(tmp)
+        svc.restore_assets()
+        assert open(os.path.join(app, "assets", "wallpapers", "wp-01.jpg")).read() == "photo"
+        assert open(os.path.join(app, "assets", "icons", "a.png")).read() == "icone"
+        assert open(os.path.join(app, "config", "launchpoints.json")).read() == "{}"
+        open(os.path.join(app, "config", "launchpoints.json"), "w").write("modifié")
+        svc.restore_assets()
+        assert open(os.path.join(app, "config", "launchpoints.json")).read() == "modifié"
+
+
+def test_data_is_backed_up_and_restored_after_an_update_wipes_the_app_folder():
+    with tempfile.TemporaryDirectory() as tmp:
+        svc, app, persist = make_persist(tmp)
+        svc.tick()
+        svc.backup_data()
+        assert os.path.exists(os.path.join(persist, "data", "usage-2026-11-12.log"))
+        import shutil
+        shutil.rmtree(app)  # mise à jour d'ApOS : le dossier de l'app est remplacé
+        again, app2, _ = make_persist(tmp)
+        assert open(os.path.join(app2, "data", "usage-2026-11-12.log")).read().strip().endswith("netflix")
+        assert again.usage.total == 10
+
+
+def test_restored_raw_logs_are_skipped_when_a_summary_already_exists():
+    with tempfile.TemporaryDirectory() as tmp:
+        persist = os.path.join(tmp, "persist", "data")
+        os.makedirs(persist)
+        open(os.path.join(persist, "usage-2026-11-01.log"), "w").write("10:00:00 a\n")
+        open(os.path.join(persist, "usage-2026-11-01.tsv"), "w").write("a\t10\n")
+        svc, app, _ = make_persist(tmp)
+        assert not os.path.exists(os.path.join(app, "data", "usage-2026-11-01.log"))
+        assert os.path.exists(os.path.join(app, "data", "usage-2026-11-01.tsv"))

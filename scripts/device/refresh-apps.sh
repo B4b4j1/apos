@@ -25,3 +25,4 @@ scp -q "${SSH_OPTS[@]}" "root@${HOST}:$APP/config/launchpoints.json" "$TMP/confi
 scp -q -r "${SSH_OPTS[@]}" "root@${HOST}:$APP/assets/icons" "$TMP/assets/"
 "$PY" "$HERE/add_icon_colors.py" "$TMP"
 scp -q "${SSH_OPTS[@]}" "$TMP/config/launchpoints.json" "root@${HOST}:$APP/config/launchpoints.json"
+"$HERE/persist-assets.sh" "$HOST"

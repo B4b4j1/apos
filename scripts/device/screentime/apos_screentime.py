@@ -13,6 +13,7 @@ import hmac
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -31,6 +32,9 @@ PIN_LOCKOUT_SECONDS = 60
 TOAST_INTERVAL_SECONDS = 300
 RELAUNCH_MIN_SECONDS = 5
 PBKDF2_ROUNDS = 50000
+ASSET_PATHS = ("assets/wallpapers", "assets/icons", "config/launchpoints.json")
+RESTORE_EVERY_SECONDS = 60
+BACKUP_EVERY_SECONDS = 300
 
 
 def luna(uri, params, timeout=5):
@@ -108,7 +112,9 @@ def write_json(path, data):
 
 
 class Service:
-    def __init__(self, data_dir, config_path, luna_fn, now, interval=10, state_path=None):
+    def __init__(self, data_dir, config_path, luna_fn, now, interval=10, state_path=None, app_dir=None, persist_dir=None):
+        self.app_dir = app_dir
+        self.persist_dir = persist_dir
         self.data_dir = data_dir
         self.config_path = config_path
         self.state_path = state_path or os.path.join(os.path.dirname(config_path) or ".", "apos-screentime-state.json")
@@ -126,6 +132,8 @@ class Service:
         self.last_toast = None
         self.last_launch = None
         os.makedirs(data_dir, exist_ok=True)
+        self.restore_data()
+        self.restore_assets()
         write_json(os.path.join(data_dir, "meta.json"), {"interval": interval})
         self.config = self._load_config()
         self.day = self.now().strftime("%Y-%m-%d")
@@ -181,6 +189,50 @@ class Service:
             path = os.path.join(self.data_dir, name)
             if name.startswith("usage-") and name.endswith(".tsv") and os.path.getmtime(path) < cutoff:
                 os.remove(path)
+
+    # ---------- persistance : survit à une mise à jour d'ApOS (le dossier de l'app est alors remplacé) ----------
+
+    @staticmethod
+    def _copy_missing(src, dst):
+        """Copie src vers dst sans jamais écraser un fichier existant (fichier ou dossier)."""
+        if os.path.isdir(src):
+            for name in os.listdir(src):
+                Service._copy_missing(os.path.join(src, name), os.path.join(dst, name))
+        elif os.path.isfile(src) and not os.path.exists(dst):
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+
+    def restore_assets(self):
+        if not (self.app_dir and self.persist_dir):
+            return
+        for rel in ASSET_PATHS:
+            self._copy_missing(os.path.join(self.persist_dir, rel), os.path.join(self.app_dir, rel))
+
+    def restore_data(self):
+        if not self.persist_dir:
+            return
+        saved = os.path.join(self.persist_dir, "data")
+        if not os.path.isdir(saved):
+            return
+        for name in os.listdir(saved):
+            if name.endswith(".log") and (os.path.exists(os.path.join(saved, name[:-4] + ".tsv")) or os.path.exists(os.path.join(self.data_dir, name[:-4] + ".tsv"))):
+                continue  # journal déjà résumé
+            self._copy_missing(os.path.join(saved, name), os.path.join(self.data_dir, name))
+
+    def backup_data(self):
+        if not self.persist_dir:
+            return
+        saved = os.path.join(self.persist_dir, "data")
+        os.makedirs(saved, exist_ok=True)
+        for name in os.listdir(self.data_dir):
+            if not (name.startswith("usage-") or name == "meta.json"):
+                continue
+            src, dst = os.path.join(self.data_dir, name), os.path.join(saved, name)
+            if not os.path.exists(dst) or os.path.getmtime(src) > os.path.getmtime(dst) or os.path.getsize(src) != os.path.getsize(dst):
+                shutil.copy2(src, dst)
+        for name in os.listdir(saved):  # un journal résumé n'a plus besoin de son brut
+            if name.endswith(".log") and os.path.exists(os.path.join(saved, name[:-4] + ".tsv")):
+                os.remove(os.path.join(saved, name))
 
     # ---------- mesure ----------
 
@@ -397,12 +449,23 @@ def main():
     data_dir = os.environ.get("APOS_DATA", "/media/developer/apps/usr/palm/applications/com.apos.launcher/data")
     config = os.environ.get("APOS_CONFIG", "/var/lib/webosbrew/apos-screentime.json")
     interval = int(os.environ.get("APOS_INTERVAL", "10"))
-    service = Service(data_dir, config, luna, datetime.now, interval)
+    app_dir = os.path.dirname(data_dir.rstrip("/"))
+    persist = os.environ.get("APOS_PERSIST", "/var/lib/webosbrew/apos")
+    service = Service(data_dir, config, luna, datetime.now, interval, app_dir=app_dir, persist_dir=persist)
     server = make_server(service)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    last_restore = last_backup = time.time()
     while True:
         try:
             service.tick()
+            now = time.time()
+            if now - last_restore >= RESTORE_EVERY_SECONDS:
+                last_restore = now
+                service.restore_assets()
+                service.restore_data()
+            if now - last_backup >= BACKUP_EVERY_SECONDS:
+                last_backup = now
+                service.backup_data()
         except Exception as err:  # le service ne doit jamais s'arrêter
             sys.stderr.write("tick: %r\n" % (err,))
         time.sleep(interval)
