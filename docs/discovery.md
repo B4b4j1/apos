@@ -31,3 +31,4 @@
 - Les apps déjà installées (`/media/developer/apps/usr/palm/applications/`) : org.webosbrew.hbchannel, org.webosbrew.appupdateblocker, tv.stremioorigin.app, youtube.leanback.v4, ooo.lew.lifesgoodwithoutspying.
 - Le paquet copié dans `/media/developer/` pour un essai a été supprimé.
 - Aucun changement durable sur la TV ; le launcher n'est pas installé.
+- Essai via la méthode « Manual » du README Homebrew Channel (`luna-send-pub -i luna://com.webos.appInstallService/dev/install`, `ipkUrl` dans /tmp) : aucune réponse, aucune app installée. Le fichier temporaire a été supprimé.
