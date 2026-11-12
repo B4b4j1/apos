@@ -24,7 +24,6 @@ import { DAILY_CHOICES, APP_CHOICES, EXTENSION_CHOICES, ACTION_CHOICES, limitLab
 const LONG_PRESS_MS = 700; // maintien de OK : mode réorganisation
 const LIST_VISIBLE_ROWS = 9; // lignes visibles dans un écran de réglages avant défilement
 const ROW_STEP = 84;
-const VERSION = "0.2.0";
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -522,7 +521,7 @@ export function render(root, catalog, env) {
       { label: "Paramètres LG", chevron: true, icon: "system", desc: "Ouvre les réglages officiels de la TV (image, son, réseau…).", onSelect: launchEntry("com.palm.app.settings") },
       { label: "Accueil LG", chevron: true, icon: "home", desc: "Ouvre l'écran d'accueil d'origine de la TV.", onSelect: launchEntry("com.webos.app.home") },
       { label: "Recharger ApOS", icon: "system", desc: "Relance l'interface d'ApOS.", onSelect: () => window.location.reload() },
-      { label: "À propos", value: "ApOS " + VERSION, icon: "system", desc: allApps().length + " apps, " + wallpapers.length + " fonds d'écran. Aucune donnée n'est envoyée sur Internet." },
+      { label: "À propos", value: "ApOS " + (appVersion || ""), icon: "system", desc: allApps().length + " apps, " + wallpapers.length + " fonds d'écran. Aucune donnée n'est envoyée sur Internet." },
     ];
     return { kind: "list", title: "Système", preview: { icon: "system", text: "Réglages officiels de la TV et informations." }, rows };
   }
