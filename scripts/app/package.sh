@@ -18,7 +18,7 @@ find "$STAGE/assets/wallpapers" -type f -delete 2>/dev/null || true
 find "$STAGE" \( -name .gitkeep -o -name .DS_Store \) -delete
 
 # seule exception : l'API locale du service de temps d'écran (127.0.0.1, jamais Internet)
-if grep -rEn 'https?://' "$STAGE" --include='*.js' --include='*.html' --include='*.css' --include='*.json' | grep -v -F 'http://127.0.0.1:8742'; then
+if grep -rEn 'https?://' "$STAGE" --include='*.js' --include='*.html' --include='*.css' --include='*.json' | grep -v -F -e 'http://127.0.0.1:8742' -e 'http://www.w3.org/2000/svg'; then
   echo "Référence distante détectée dans le paquet : abandon." >&2
   exit 1
 fi
