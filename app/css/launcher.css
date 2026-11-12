@@ -41,6 +41,9 @@ svg { display: block; width: 100%; height: 100%; }
 .clock--large { --cs: 1.35; }
 .clock--left { left: var(--edge); }
 .clock--right { right: 330px; text-align: right; }
+.clock--row { display: flex; flex-wrap: wrap; align-items: baseline; }
+.clock--row .clock__date { order: 1; }
+.clock--row .clock__time { order: 2; }
 .clock--row .clock__date, .clock--row .clock__time { font-size: calc(30px * var(--fs) * var(--cs)); font-weight: 400; }
 .clock--row .clock__date { margin-right: 16px; }
 .clock--stacked { display: flex; flex-direction: column-reverse; }
@@ -59,12 +62,12 @@ svg { display: block; width: 100%; height: 100%; }
 .topbtn--focused { transform: scale(1.2); background: rgba(255, 255, 255, 0.78); color: #10243a; box-shadow: 0 14px 28px rgba(0, 0, 0, 0.35); }
 
 /* ---------- dock en verre et tuiles ---------- */
-.dock { position: absolute; z-index: 2; left: 160px; width: 1600px; bottom: 68px; height: calc(var(--tile-h) + 48px);
+.dock { position: absolute; z-index: 2; left: 140px; width: 1640px; bottom: 68px; height: calc(var(--tile-h) + 48px);
   border-radius: 46px; background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.28); }
 .no-dock-glass .dock { background: none; box-shadow: none; }
 .dock-blur .dock { -webkit-backdrop-filter: blur(24px); backdrop-filter: blur(24px); }
-.row__viewport { position: absolute; left: 22px; right: 22px; top: 24px; bottom: 24px; -webkit-clip-path: inset(-90px 0 -110px 0); clip-path: inset(-90px 0 -110px 0); }
-.row__track { display: flex; flex-direction: row; transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1); will-change: transform; }
+.row__viewport { position: absolute; left: 0; right: 0; top: 24px; bottom: 24px; -webkit-clip-path: inset(-90px 0 -110px 0); clip-path: inset(-90px 0 -110px 0); }
+.row__track { display: flex; flex-direction: row; padding-left: 42px; transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1); will-change: transform; }
 .row__empty { font-size: 24px; color: rgba(255, 255, 255, 0.7); height: var(--tile-h); line-height: var(--tile-h); padding-left: 20px; }
 
 .tile { flex: 0 0 auto; width: var(--tile-w); margin-right: var(--tile-gap); text-align: center; }
@@ -110,3 +113,13 @@ svg { display: block; width: 100%; height: 100%; }
 .status { position: absolute; z-index: 3; left: var(--edge); bottom: 14px; font-size: 18px; color: rgba(255, 255, 255, 0.75); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.8); }
 
 .reduce-motion *, .reduce-motion *::before, .reduce-motion *::after { transition: none !important; }
+
+/* widget temps d'écran sous l'horloge */
+.clock__screen { display: inline-flex; align-items: center; align-self: flex-start; margin-top: 14px; padding: 6px 18px 6px 12px; border-radius: 26px;
+  background: rgba(255, 255, 255, 0.16); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.24); font-size: calc(22px * var(--fs)); font-weight: 400; }
+.clock--row .clock__screen { order: 4; flex: 0 0 auto; }
+.clock__break { display: none; }
+.clock--row .clock__break { display: block; order: 3; flex: 0 0 100%; height: 0; }
+.clock--right.clock--row { justify-content: flex-end; }
+.clock__screenicon { width: 26px; height: 26px; margin-right: 10px; opacity: 0.9; }
+.clock--right .clock__screen { align-self: flex-end; }

@@ -15,6 +15,7 @@ import { GROUPS, loadSettings, saveSettings } from "./settings.js";
 import { readHidden, saveHidden, toggleHidden, filterHidden } from "./hidden.js";
 import { tileMetrics } from "./metrics.js";
 import { iconSvg } from "./icons.js";
+import { loadDay, loadRange, loadInterval, totalSeconds, sortedUsage, formatDuration, appTitle } from "./screentime.js";
 
 const LONG_PRESS_MS = 700; // maintien de OK : mode réorganisation
 const LIST_VISIBLE_ROWS = 9; // lignes visibles dans un écran de réglages avant défilement
@@ -32,6 +33,10 @@ function svgSpan(name, className) {
   const span = el("span", className);
   span.innerHTML = iconSvg(name);
   return span;
+}
+
+function fetchText(url) {
+  return fetch(url, { cache: "no-store" }).then((r) => (r.ok ? r.text() : null)).catch(() => null);
 }
 
 function buildTile(entry, colorize) {
@@ -170,9 +175,76 @@ export function render(root, catalog, env) {
   function buildClock() {
     const cls = "clock clock--" + settings.clockLayout + " clock--" + settings.clockPosition + (settings.clockSize === "large" ? " clock--large" : "");
     const node = el("div", cls);
+    if (settings.screenTimeWidget) {
+      const widget = el("div", "clock__screen");
+      widget.appendChild(svgSpan("hourglass", "clock__screenicon"));
+      widget.appendChild(el("span", "clock__screentext", "Écran aujourd'hui : …"));
+      node.appendChild(widget);
+    }
     node.appendChild(el("span", "clock__date"));
     node.appendChild(el("span", "clock__time"));
+    node.appendChild(el("div", "clock__break"));
     return node;
+  }
+
+  // ---------- temps d'écran ----------
+
+  let usageInterval = 10;
+  let intervalKnown = false;
+
+  function refreshScreenTime() {
+    const text = document.querySelector(".clock__screentext");
+    if (!text) return;
+    const load = intervalKnown ? Promise.resolve(usageInterval) : loadInterval(fetchText).then((n) => { usageInterval = n; intervalKnown = true; return n; });
+    load.then((n) => loadDay(fetchText, new Date(), 0, n)).then((usage) => {
+      const node = document.querySelector(".clock__screentext");
+      if (node) node.textContent = "Écran aujourd'hui : " + formatDuration(totalSeconds(usage));
+    });
+  }
+
+  function appTitles() {
+    const titles = {};
+    allApps().forEach((a) => { titles[a.id] = a.title; });
+    return titles;
+  }
+
+  function appIcons() {
+    const icons = {};
+    allApps().forEach((a) => { icons[a.id] = a.icon; });
+    return icons;
+  }
+
+  let report = null; // { today, yesterday, week } : temps d'écran en secondes par app
+
+  function openScreenTime() {
+    const now = new Date();
+    loadInterval(fetchText).then((n) => {
+      usageInterval = n; intervalKnown = true;
+      return Promise.all([loadDay(fetchText, now, 0, n), loadDay(fetchText, now, 1, n), loadRange(fetchText, now, 7, n)]);
+    }).then((res) => {
+      report = { today: res[0], yesterday: res[1], week: res[2] };
+      push(screenTimeView);
+    });
+  }
+
+  function usageDetailView(title, usage) {
+    const titles = appTitles();
+    const icons = appIcons();
+    const list = sortedUsage(usage);
+    const rows = [{ label: "Total", value: formatDuration(totalSeconds(usage)), icon: "hourglass", desc: "Temps total passé devant la TV allumée sur cette période." }];
+    if (list.length === 0) rows.push({ label: "Aucune donnée", icon: "hourglass", desc: "Le collecteur n'a rien enregistré : TV en veille ou collecteur arrêté (voir le README)." });
+    list.forEach((u) => rows.push({ label: appTitle(u.id, titles), value: formatDuration(u.seconds), thumb: icons[u.id] || "", icon: "hourglass", desc: Math.round(100 * u.seconds / totalSeconds(usage)) + " % du temps d'écran de la période." }));
+    return { kind: "list", title, preview: { icon: "hourglass", text: "Temps d'écran par application." }, rows };
+  }
+
+  function screenTimeView() {
+    const periods = [["Aujourd'hui", report.today], ["Hier", report.yesterday], ["7 derniers jours", report.week]];
+    const rows = periods.map((p) => ({
+      label: p[0], value: formatDuration(totalSeconds(p[1])), chevron: true, icon: "hourglass",
+      desc: "Détail par application. Seules les périodes où la TV est allumée sont comptées.",
+      onSelect: () => push(() => usageDetailView(p[0], p[1])),
+    }));
+    return { kind: "list", title: "Temps d'écran", preview: { icon: "hourglass", text: "Temps passé devant la TV, au total et par application. Les données restent sur la TV." }, rows };
   }
 
   // ---------- données ----------
@@ -296,6 +368,7 @@ export function render(root, catalog, env) {
     const rows = [
       { label: "Applications", chevron: true, icon: "apps", desc: "Masquer des apps, réinitialiser l'ordre.", onSelect: () => push(appsView) },
       { label: "Fonds d'écran", chevron: true, icon: "wallpaper", desc: g("wallpaper").description, onSelect: () => push(wallpaperView) },
+      { label: "Temps d'écran", chevron: true, icon: "hourglass", desc: "Rapport quotidien : total et par application.", onSelect: openScreenTime },
       { label: "Horloge", chevron: true, icon: "clock", desc: g("clock").description, onSelect: () => push(() => groupView(g("clock"))) },
       { label: "Apparence", chevron: true, icon: "appearance", desc: g("appearance").description, onSelect: () => push(() => groupView(g("appearance"))) },
       { label: "Système", chevron: true, icon: "system", desc: "Réglages LG, accueil LG, à propos.", onSelect: () => push(systemView) },
@@ -314,7 +387,9 @@ export function render(root, catalog, env) {
         if (r.kind !== "top") t.classList.toggle("tile--lifted", reordering && focused);
       });
       if (r.kind !== "top") {
-        const offset = ri === pos.row ? Math.max(0, pos.col - (metrics.visible - 1)) * metrics.step : 0;
+        // Au-delà de la dernière tuile entièrement visible, on décale d'une marge de plus : la tuile précédente
+        // disparaît et un bout de la suivante reste visible. Sans cela, la tuile active agrandie serait rognée au bord.
+        const offset = ri === pos.row && pos.col >= metrics.visible ? (pos.col - (metrics.visible - 1)) * metrics.step + 42 : 0;
         r.track.style.transform = "translateX(" + -offset + "px)";
       }
     });
@@ -352,6 +427,7 @@ export function render(root, catalog, env) {
     const start = top().pos || view.start;
     grid.setPosition(start.row, start.col);
     updateClock();
+    if (onHome()) refreshScreenTime();
     paintGrid();
   }
 
@@ -474,6 +550,7 @@ export function render(root, catalog, env) {
   applyMode();
   show();
   scheduleClock();
+  setInterval(() => { if (onHome()) refreshScreenTime(); }, 15000);
   loadApps();
 
   document.addEventListener("keydown", (ev) => {

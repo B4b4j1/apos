@@ -41,6 +41,7 @@ export const GROUPS = [
       toggle("clockDate", "Afficher la date", "Montre le jour et la date avec l'heure.", true),
       toggle("clockSeconds", "Afficher les secondes", "L'horloge se met à jour chaque seconde.", false),
       choice("clockSize", "Taille", "Taille de l'horloge.", [c("normal", "Normale"), c("large", "Grande")], "normal"),
+      toggle("screenTimeWidget", "Temps d'écran sous l'horloge", "Affiche le temps d'écran du jour, mis à jour en direct.", true),
     ],
   },
   {

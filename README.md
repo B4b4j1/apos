@@ -22,6 +22,13 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 - Réglages > Applications : masquer des apps ; Fonds d'écran : diaporama, photo fixe, durée, assombrissement ; Horloge : disposition (une ligne / empilée), position, 24 h / 12 h, date, secondes, taille ; Apparence : taille, forme et style des tuiles, noms, mise en valeur, taille du texte, animations, dock en verre, flous ; Système : réglages LG, accueil LG, recharger, à propos.
 - Tous les réglages sont mémorisés dans le stockage local de l'app. La météo de Lumen n'est pas reprise : elle exige des appels réseau.
 
+## Temps d'écran
+- Un collecteur tourne sur la TV (`scripts/device/screentime/apos-screentime.sh`, lancé au démarrage par un script init.d). Toutes les 10 s, si la TV est allumée (état d'alimentation « Active »), il note l'app au premier plan dans `data/usage-AAAA-MM-JJ.log` de l'app ; les jours passés sont résumés en `.tsv` (90 jours conservés). Aucune donnée ne quitte la TV.
+- Installation / retrait : `bash scripts/device/install-screentime.sh <ip-tv>` et `restore-screentime.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin).
+- Widget sous l'horloge (réglable dans Horloge) : temps d'écran du jour, rafraîchi toutes les 15 s. Rapport : Réglages > Temps d'écran (aujourd'hui, hier, 7 jours, total et par app).
+- Réinstaller ApOS depuis un paquet efface le dossier `data/` (l'historique) ; `scripts/device/deploy-app.sh <ip-tv>` le conserve.
+- Les écrans de veille et la veille de la TV ne sont pas comptés. Le jour change à minuit selon le fuseau horaire de la TV.
+
 ## Liste des apps (launcher)
 - Une app web ne peut pas lister les apps via Luna. `bash scripts/device/refresh-apps.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin) génère sur la TV `config/launchpoints.json`, copie les icônes et calcule la couleur de tuile de chaque app (sur le Mac, avec Pillow). À relancer après l'ajout ou la suppression d'une app, ou après une réinstallation d'ApOS.
 
