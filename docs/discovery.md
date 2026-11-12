@@ -4,6 +4,7 @@
 - webOS : 10.3.2 (fourni par l'utilisateur)
 - Méthode de root : « slopbro », via repo.webosbrew.org (fourni par l'utilisateur ; ce nom n'apparaît pas dans le guide webosbrew.org/rooting, à vérifier sur https://canirootmytv.com ou rootmy.tv avant toute manipulation)
 - Version de l'outil root : à relever
+- Version du firmware exacte (« Version du logiciel », à relever sur la TV) : à comparer à 13.40.90
 - DNS local sur le routeur : inconnu (à vérifier)
 - Enfants mineurs concernés : non
 
