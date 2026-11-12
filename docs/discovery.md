@@ -38,3 +38,4 @@
 - Telnet : désactivé. SSH Server : activé. Block system updates : activé. Failsafe mode : désactivé.
 - Dépôts : repo.webosbrew.org (défaut) et repo.webosbrew.org « Extra non-free software », tous deux activés. Bouton « Add repository » présent.
 - Reboot requis après changement de configuration.
+- Installation réussie via Homebrew Channel (dépôt local http://192.168.1.12:8000, paquet com.apos.launcher 0.1.0) ; l'écran d'accueil ApOS s'affiche sur la TV (tuiles Accueil et Réglages). Le démarrage automatique n'est pas encore configuré.
