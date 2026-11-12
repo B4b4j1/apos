@@ -1,0 +1,4 @@
+#!/bin/sh
+# Lance ApOS après le démarrage. Retirer ce fichier pour désactiver.
+sleep 60
+luna-send -n 1 luna://com.webos.applicationManager/launch '{"id":"com.apos.launcher"}' >/var/log/apos-autostart.log 2>&1
