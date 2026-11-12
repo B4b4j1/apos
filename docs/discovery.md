@@ -44,3 +44,5 @@
 - `luna-send` ne répond pas dans une session SSH sans terminal si son stdin n'est pas redirigé : toujours `luna-send ... </dev/null`. Avec cette redirection, les appels fonctionnent en SSH (`getForegroundAppInfo`, `tvpower/power/getPowerState`, `applicationManager/running`…). La conclusion précédente « le bus Luna n'est pas joignable en SSH » était fausse.
 - États d'alimentation vus : « Screen Saver » (veille écran, inactif) ; le temps d'écran ne compte que l'état « Active ».
 - Le fuseau horaire de la TV est GMT (l'horloge d'ApOS a une heure de moins qu'à Paris en hiver) : à régler dans les paramètres LG si besoin.
+- Fuseau horaire réglé sur Europe/Paris le 2026-11-12 par `luna://com.webos.service.systemservice/setPreferences` (`timeZone.ZoneID`), ce qui met à jour le lien `/var/luna/preferences/localtime`. Valeur d'origine : `Etc/GMT-0`.
+- Notification : `luna://com.webos.notification/createToast {"message": "..."}` affiche un message par-dessus n'importe quelle app (utilisé pour la limite de temps d'écran).

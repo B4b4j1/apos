@@ -11,7 +11,16 @@ const BACK_CODES = { 461: true, 10009: true, 27: true, 8: true };
 // 403 : bouton rouge de la télécommande LG : mode réorganisation des tuiles.
 const REORDER_CODES = { 403: true };
 
+function digitOf(ev) {
+  if (typeof ev.key === "string" && /^[0-9]$/.test(ev.key)) return ev.key;
+  if (ev.keyCode >= 48 && ev.keyCode <= 57) return String(ev.keyCode - 48);
+  if (ev.keyCode >= 96 && ev.keyCode <= 105) return String(ev.keyCode - 96);
+  return null;
+}
+
 export function keyAction(ev) {
+  const digit = digitOf(ev);
+  if (digit !== null) return { type: "digit", digit };
   const dir = DIR_BY_NAME[ev.key] || DIR_BY_CODE[ev.keyCode];
   if (dir) return { type: "move", dir };
   if (SELECT_NAMES[ev.key] || SELECT_CODES[ev.keyCode]) return { type: "select" };

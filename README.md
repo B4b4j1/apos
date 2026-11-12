@@ -22,12 +22,17 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 - Réglages > Applications : masquer des apps ; Fonds d'écran : diaporama, photo fixe, durée, assombrissement ; Horloge : disposition (une ligne / empilée), position, 24 h / 12 h, date, secondes, taille ; Apparence : taille, forme et style des tuiles, noms, mise en valeur, taille du texte, animations, dock en verre, flous ; Système : réglages LG, accueil LG, recharger, à propos.
 - Tous les réglages sont mémorisés dans le stockage local de l'app. La météo de Lumen n'est pas reprise : elle exige des appels réseau.
 
-## Temps d'écran
-- Un collecteur tourne sur la TV (`scripts/device/screentime/apos-screentime.sh`, lancé au démarrage par un script init.d). Toutes les 10 s, si la TV est allumée (état d'alimentation « Active »), il note l'app au premier plan dans `data/usage-AAAA-MM-JJ.log` de l'app ; les jours passés sont résumés en `.tsv` (90 jours conservés). Aucune donnée ne quitte la TV.
+## Temps d'écran, limites et code PIN
+- Un service Python tourne sur la TV (`scripts/device/screentime/apos_screentime.py`, lancé au démarrage par `init.d/70-apos-screentime`). Toutes les 10 s, si la TV est allumée (état « Active »), il note l'app au premier plan dans `data/usage-AAAA-MM-JJ.log` de l'app ; les jours passés sont résumés en `.tsv` (90 jours conservés). Aucune donnée ne quitte la TV. L'économiseur d'écran et la veille ne sont pas comptés.
 - Installation / retrait : `bash scripts/device/install-screentime.sh <ip-tv>` et `restore-screentime.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin).
-- Widget sous l'horloge (réglable dans Horloge) : temps d'écran du jour, rafraîchi toutes les 15 s. Rapport : Réglages > Temps d'écran (aujourd'hui, hier, 7 jours, total et par app).
+- Widget sous l'horloge (réglable dans Horloge) : temps d'écran du jour, rafraîchi toutes les 15 s.
+- Réglages > Temps d'écran : histogramme des 7 derniers jours, total et par app (aujourd'hui, hier, 7 jours), puis les limites.
+- Limites : limite quotidienne et limites par application. À la limite : « Message » (notification sur la TV, rappelée toutes les 5 min) ou « Verrouillage » (ApOS revient au premier plan et affiche un écran de code PIN ; Retour et flèche gauche ne le ferment pas). Le bon code prolonge de 15, 30 ou 60 min. Pour une limite d'app, « Fermer » quitte l'écran sans prolonger.
+- Code PIN (4 à 8 chiffres) : protège la modification des limites et débloque l'écran de blocage. Il est stocké salé et haché (PBKDF2) dans `/var/lib/webosbrew/apos-screentime.json`, jamais renvoyé par l'API ; 5 essais faux bloquent la saisie 1 minute. Sans code défini, la prolongation est libre.
+- API locale `http://127.0.0.1:8742` (état, configuration, code PIN, déblocage) : liée à la TV uniquement. Une autre app de la TV pourrait l'appeler ; le code PIN protège les changements de configuration.
+- Limites de la protection : c'est un cadre familial, pas une sécurité forte. Quelqu'un qui accède à la TV en SSH ou à Homebrew Channel peut arrêter le service. Éteindre la TV arrête aussi le comptage.
 - Réinstaller ApOS depuis un paquet efface le dossier `data/` (l'historique) ; `scripts/device/deploy-app.sh <ip-tv>` le conserve.
-- Les écrans de veille et la veille de la TV ne sont pas comptés. Le jour change à minuit selon le fuseau horaire de la TV.
+- Fuseau horaire : `scripts/device/set-timezone.sh <ip-tv> [zone]` (Europe/Paris par défaut ; retour : `Etc/GMT-0`). Le jour du rapport change à minuit selon ce fuseau.
 
 ## Liste des apps (launcher)
 - Une app web ne peut pas lister les apps via Luna. `bash scripts/device/refresh-apps.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin) génère sur la TV `config/launchpoints.json`, copie les icônes et calcule la couleur de tuile de chaque app (sur le Mac, avec Pillow). À relancer après l'ajout ou la suppression d'une app, ou après une réinstallation d'ApOS.

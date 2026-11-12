@@ -1,9 +1,10 @@
 #!/bin/sh
-# ApOS : lance le collecteur de temps d'écran en arrière-plan, un seul exemplaire.
+# ApOS : lance le service de temps d'écran (mesure, limites, API locale 127.0.0.1:8742), un seul exemplaire.
 # Retirer ce fichier de /var/lib/webosbrew/init.d pour le désactiver au prochain démarrage.
 PIDFILE=/tmp/apos-screentime.pid
 if [ -f "$PIDFILE" ]; then
     kill "$(cat "$PIDFILE")" 2>/dev/null
+    sleep 1
 fi
-setsid sh /var/lib/webosbrew/apos-screentime.sh </dev/null >/dev/null 2>&1 &
+setsid python3 /var/lib/webosbrew/apos_screentime.py </dev/null >/tmp/apos-screentime.log 2>&1 &
 echo $! > "$PIDFILE"

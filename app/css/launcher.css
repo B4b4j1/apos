@@ -123,3 +123,29 @@ svg { display: block; width: 100%; height: 100%; }
 .clock--right.clock--row { justify-content: flex-end; }
 .clock__screenicon { width: 26px; height: 26px; margin-right: 10px; opacity: 0.9; }
 .clock--right .clock__screen { align-self: flex-end; }
+
+/* graphique des 7 derniers jours (panneau de gauche) */
+.panel__card--chart { width: 580px; height: 330px; margin: 150px 0 0 30px; border-radius: 36px; align-items: flex-end; padding: 18px 20px 14px; }
+.chart { display: flex; width: 100%; height: 100%; align-items: flex-end; }
+.chart__col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; }
+.chart__value { font-size: 17px; height: 22px; color: rgba(255, 255, 255, 0.9); white-space: nowrap; }
+.chart__bar { width: 44px; min-height: 0; border-radius: 10px 10px 4px 4px; background: rgba(255, 255, 255, 0.55); margin: 4px 0 8px; }
+.chart__col--today .chart__bar { background: #fff; }
+.chart__label { font-size: 17px; color: rgba(255, 255, 255, 0.8); height: 22px; white-space: nowrap; }
+
+/* écran de code PIN et de blocage */
+.screen--pin { background: rgba(6, 10, 22, 0.92); }
+.has-wallpaper .screen--pin { background: rgba(6, 10, 22, 0.86); }
+.screen--pin::after { display: none; }
+.pin__title { position: absolute; z-index: 2; left: 0; width: 100%; top: 70px; text-align: center; font-size: calc(54px * var(--fs)); font-weight: 600; }
+.pin__message { position: absolute; z-index: 2; left: 360px; width: 1200px; top: 160px; text-align: center; font-size: calc(28px * var(--fs)); line-height: 1.35; color: rgba(255, 255, 255, 0.85); }
+.pin__message--error { color: #ff8a80; }
+.pin__dots { position: absolute; z-index: 2; left: 0; width: 100%; top: 290px; text-align: center; }
+.pin__dot { display: inline-block; width: 24px; height: 24px; margin: 0 10px; border-radius: 50%; box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.6); }
+.pin__dot--on { background: #fff; }
+.pin__pad { position: absolute; z-index: 2; left: 0; width: 100%; top: 350px; text-align: center; }
+.pin__row { display: flex; justify-content: center; margin-bottom: 14px; }
+.pinkey { width: 150px; height: 84px; margin: 0 8px; border-radius: 42px; display: flex; align-items: center; justify-content: center; font-size: 36px; font-weight: 500;
+  background: rgba(255, 255, 255, 0.18); transition: transform 120ms ease-out, background 120ms ease-out; }
+.pinkey--wide { width: 324px; font-size: 28px; }
+.pinkey--focused { background: #fff; color: #10151f; transform: scale(1.08); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4); }

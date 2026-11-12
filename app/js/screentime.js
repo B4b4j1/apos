@@ -87,6 +87,12 @@ export function loadDay(fetchText, now, back, interval) {
   });
 }
 
+export function loadDays(fetchText, now, days, interval) {
+  const jobs = [];
+  for (let back = 0; back < days; back++) jobs.push(loadDay(fetchText, now, back, interval));
+  return Promise.all(jobs);
+}
+
 export function loadRange(fetchText, now, days, interval) {
   const jobs = [];
   for (let back = 0; back < days; back++) jobs.push(loadDay(fetchText, now, back, interval));

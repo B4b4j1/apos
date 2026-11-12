@@ -27,3 +27,7 @@ export function formatClock(date, settings) {
   }
   return { time, date: text };
 }
+
+export function weekdayShort(date) {
+  return DAYS_SHORT[date.getDay()];
+}

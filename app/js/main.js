@@ -10,12 +10,15 @@ import { createSlideshow } from "./slideshow.js";
 import { applyOrder, moveId, readOrder, saveOrder } from "./order.js";
 import { launchApp } from "./luna.js";
 import { normalizeApps } from "./apps.js";
-import { formatClock } from "./clock.js";
+import { formatClock, weekdayShort } from "./clock.js";
 import { GROUPS, loadSettings, saveSettings } from "./settings.js";
 import { readHidden, saveHidden, toggleHidden, filterHidden } from "./hidden.js";
 import { tileMetrics } from "./metrics.js";
 import { iconSvg } from "./icons.js";
-import { loadDay, loadRange, loadInterval, totalSeconds, sortedUsage, formatDuration, appTitle } from "./screentime.js";
+import { loadDay, loadDays, loadRange, loadInterval, totalSeconds, sortedUsage, formatDuration, appTitle } from "./screentime.js";
+import { createApi, API_BASE } from "./api.js";
+import { chartBars, shortDuration } from "./chart.js";
+import { DAILY_CHOICES, APP_CHOICES, EXTENSION_CHOICES, ACTION_CHOICES, limitLabel, lockMessage, pinPress } from "./limits.js";
 
 const LONG_PRESS_MS = 700; // maintien de OK : mode réorganisation
 const LIST_VISIBLE_ROWS = 9; // lignes visibles dans un écran de réglages avant défilement
@@ -69,6 +72,7 @@ export function render(root, catalog, env) {
   // Liste des apps : config/launchpoints.json, généré sur la TV par scripts/device/refresh-apps.sh
   // (une app web n'a pas le droit de lister les apps via Luna).
   const listApps = opts.listApps || (() => fetch("config/launchpoints.json").then((r) => { if (!r.ok) throw new Error("HTTP " + r.status); return r.json(); }));
+  const api = opts.api || createApi(API_BASE);
   const pinned = catalog.apps.map((a) => ({ id: a.target, title: a.title, icon: "" }));
 
   let settings = loadSettings(storage);
@@ -85,6 +89,9 @@ export function render(root, catalog, env) {
   let longFired = false;
   let swallowSelectUp = false;
   let clockTimer = null;
+  let limitState = null; // état du service de temps d'écran (null = injoignable)
+  let pinOkAt = 0; // dernier code PIN validé pour les réglages (valable 5 min)
+  let lastPin = "";
 
   const top = () => stack[stack.length - 1];
   const onHome = () => stack.length === 1;
@@ -220,9 +227,10 @@ export function render(root, catalog, env) {
     const now = new Date();
     loadInterval(fetchText).then((n) => {
       usageInterval = n; intervalKnown = true;
-      return Promise.all([loadDay(fetchText, now, 0, n), loadDay(fetchText, now, 1, n), loadRange(fetchText, now, 7, n)]);
+      return Promise.all([loadDay(fetchText, now, 0, n), loadDay(fetchText, now, 1, n), loadRange(fetchText, now, 7, n), loadDays(fetchText, now, 7, n), api.state()]);
     }).then((res) => {
-      report = { today: res[0], yesterday: res[1], week: res[2] };
+      report = { today: res[0], yesterday: res[1], week: res[2], days: res[3], now };
+      limitState = res[4];
       push(screenTimeView);
     });
   }
@@ -244,7 +252,157 @@ export function render(root, catalog, env) {
       desc: "Détail par application. Seules les périodes où la TV est allumée sont comptées.",
       onSelect: () => push(() => usageDetailView(p[0], p[1])),
     }));
-    return { kind: "list", title: "Temps d'écran", preview: { icon: "hourglass", text: "Temps passé devant la TV, au total et par application. Les données restent sur la TV." }, rows };
+    // histogramme des 7 derniers jours (le plus ancien à gauche, aujourd'hui à droite)
+    const totals = report.days.map(totalSeconds).reverse();
+    const bars = chartBars(totals, 190);
+    const chart = bars.map((b, i) => {
+      const d = new Date(report.now.getTime());
+      d.setDate(d.getDate() - (6 - i));
+      return { label: weekdayShort(d).replace(".", "") + " " + d.getDate(), seconds: b.seconds, height: b.height, today: i === 6 };
+    });
+    limitRows().forEach((r) => rows.push(r));
+    return { kind: "list", title: "Temps d'écran", chart, preview: { icon: "hourglass", text: "7 derniers jours : " + formatDuration(totalSeconds(report.week)) + ". Les données restent sur la TV." }, rows };
+  }
+
+  // ---------- limites de temps, code PIN, écran de blocage ----------
+
+  function pinFresh() { return Date.now() - pinOkAt < 300000; }
+
+  function refreshLimits() {
+    return api.state().then((st) => {
+      limitState = st;
+      const open = stack.some((e) => e.lock);
+      if (st && st.locked && !open) {
+        reordering = false;
+        say("");
+        stack.push({ build: lockView, lock: true, noBack: st.reason === "daily", pin: "", msg: "" });
+        show();
+      } else if (!(st && st.locked) && open) {
+        for (let i = stack.length - 1; i > 0; i--) if (stack[i].lock) stack.splice(i, 1);
+        show();
+      }
+    });
+  }
+
+  function lockView() {
+    const st = limitState;
+    const hasPin = st.has_pin;
+    const extra = formatDuration(st.config.extension);
+    return pinView({
+      title: "Temps d'écran",
+      message: lockMessage(st, appTitles()) + (hasPin ? " Entrez le code PIN pour prolonger de " + extra + "." : " Aucun code défini : validez pour prolonger de " + extra + "."),
+      cancel: st.reason === "app" ? "Fermer" : "",
+      minLength: hasPin ? 4 : 0,
+      onCancel: () => { api.post("/ack", {}).then(() => refreshLimits()); },
+      onSubmit: (pin) => api.post("/unlock", { pin }).then((res) => {
+        if (res.body.ok) { return refreshLimits().then(() => ({ ok: true })); }
+        return { ok: false, error: res.status === 429 ? "Trop d'essais, attendez une minute." : (res.status === 0 ? "Service injoignable." : "Code incorrect.") };
+      }),
+    });
+  }
+
+  // opts : { title, message, cancel (libellé ou ""), minLength, onSubmit(pin) -> Promise<{ok, error}>, onCancel }
+  function pinView(opts) {
+    return { kind: "pin", title: opts.title, message: opts.message, cancel: opts.cancel, minLength: opts.minLength === undefined ? 4 : opts.minLength, onSubmit: opts.onSubmit, onCancel: opts.onCancel };
+  }
+
+  // Demande le code PIN (s'il y en a un) puis exécute action(pin).
+  function withPin(title, action) {
+    if (!limitState || !limitState.has_pin || pinFresh()) { action(lastPin); return; }
+    stack.push({ pin: "", msg: "", build: () => pinView({
+      title, message: "Entrez le code PIN", cancel: "Annuler",
+      onSubmit: (pin) => api.post("/verify", { pin }).then((res) => {
+        if (res.body.ok) { pinOkAt = Date.now(); lastPin = pin; stack.pop(); show(); action(pin); return { ok: true }; }
+        return { ok: false, error: res.status === 429 ? "Trop d'essais, attendez une minute." : "Code incorrect." };
+      }),
+    }) });
+    show();
+  }
+
+  function saveConfig(values) {
+    withPin("Modifier les limites", (pin) => {
+      api.post("/config", Object.assign({}, values, { pin })).then((res) => {
+        if (res.status === 403) { pinOkAt = 0; say("Code PIN refusé."); }
+        else if (res.status !== 200) say("Service de temps d'écran injoignable.");
+        return api.state().then((st) => { limitState = st; show(); });
+      });
+    });
+  }
+
+  function limitChoiceView(title, choices, current, onPick, text) {
+    return () => ({
+      kind: "list", title, preview: { icon: "hourglass", text },
+      rows: choices.map((c) => ({ label: c.label, check: c.value === current(), onSelect: () => onPick(c.value) })),
+    });
+  }
+
+  function appLimitsView() {
+    const icons = appIcons();
+    const usage = report ? report.today : {};
+    const apps = allApps().slice().sort((a, b) => (usage[b.id] || 0) - (usage[a.id] || 0));
+    const rows = apps.map((a) => ({
+      label: a.title, thumb: icons[a.id] || "", icon: "hourglass", chevron: true,
+      value: limitLabel(limitState.config.app_limits[a.id]),
+      desc: "Durée maximale par jour pour " + a.title + ".",
+      onSelect: () => push(limitChoiceView(a.title, APP_CHOICES, () => limitState.config.app_limits[a.id] || 0, (v) => {
+        const limits = Object.assign({}, limitState.config.app_limits);
+        if (v) limits[a.id] = v; else delete limits[a.id];
+        saveConfig({ app_limits: limits });
+      }, "Durée maximale par jour pour " + a.title + ".")),
+    }));
+    return { kind: "list", title: "Limites par application", preview: { icon: "hourglass", text: "Choisissez une durée maximale par jour pour chaque application." }, rows };
+  }
+
+  function newPinFlow(old) {
+    const ask = (title, message, next) => {
+      stack.push({ pin: "", msg: "", build: () => pinView({ title, message, cancel: "Annuler", onSubmit: (pin) => { stack.pop(); next(pin); return Promise.resolve({ ok: true }); } }) });
+      show();
+    };
+    ask("Nouveau code", "Choisissez un code de 4 à 8 chiffres.", (first) => {
+      ask("Confirmer le code", "Saisissez le même code une seconde fois.", (second) => {
+        if (first !== second) { say("Les deux codes sont différents."); show(); return; }
+        api.post("/pin", { new: first, old: old }).then((res) => {
+          say(res.status === 200 ? "Code PIN enregistré." : "Code PIN non enregistré.");
+          if (res.status === 200) { pinOkAt = Date.now(); lastPin = first; }
+          return api.state().then((st) => { limitState = st; show(); });
+        });
+      });
+    });
+  }
+
+  function pinSettingsView() {
+    const rows = [{ label: limitState.has_pin ? "Modifier le code" : "Définir un code", chevron: true, icon: "hourglass",
+      desc: "Le code protège les limites et permet de prolonger le temps. 4 à 8 chiffres.",
+      onSelect: () => withPin("Code actuel", (old) => newPinFlow(limitState.has_pin ? old : "")) }];
+    if (limitState.has_pin) {
+      rows.push({ label: "Supprimer le code", icon: "hourglass", desc: "Plus personne ne pourra être bloqué par le code : les prolongations deviennent libres.",
+        onSelect: () => withPin("Code actuel", (old) => api.post("/pin", { new: "", old }).then(() => { pinOkAt = 0; return api.state().then((st) => { limitState = st; show(); }); })) });
+    }
+    return { kind: "list", title: "Code PIN", preview: { icon: "hourglass", text: "Le code est enregistré sous forme chiffrée sur la TV." }, rows };
+  }
+
+  function limitRows() {
+    if (!limitState) {
+      return [{ label: "Limites", value: "Service arrêté", icon: "hourglass", desc: "Le service de temps d'écran ne répond pas. Voir le README : scripts/device/install-screentime.sh." }];
+    }
+    const cfg = limitState.config;
+    const appCount = Object.keys(cfg.app_limits).length;
+    const lookup = (list, v) => { const f = list.filter((c) => c.value === v)[0]; return f ? f.label : ""; };
+    return [
+      { label: "Limite quotidienne", value: limitLabel(cfg.daily_limit), chevron: true, icon: "hourglass",
+        desc: "Durée totale maximale par jour, toutes applications confondues.",
+        onSelect: () => push(limitChoiceView("Limite quotidienne", DAILY_CHOICES, () => limitState.config.daily_limit, (v) => saveConfig({ daily_limit: v }), "Durée totale maximale par jour.")) },
+      { label: "Limites par application", value: appCount ? appCount + (appCount > 1 ? " apps" : " app") : "Aucune", chevron: true, icon: "hourglass",
+        desc: "Une durée maximale par jour pour chaque application.", onSelect: () => push(appLimitsView) },
+      { label: "À la limite", value: lookup(ACTION_CHOICES, cfg.action), chevron: true, icon: "hourglass",
+        desc: "Message : une notification s'affiche. Verrouillage : ApOS revient à l'écran et demande le code PIN.",
+        onSelect: () => push(limitChoiceView("À la limite", ACTION_CHOICES, () => limitState.config.action, (v) => saveConfig({ action: v }), "Message : notification. Verrouillage : écran de code PIN.")) },
+      { label: "Prolongation après le code", value: lookup(EXTENSION_CHOICES, cfg.extension), chevron: true, icon: "hourglass",
+        desc: "Temps ajouté quand le bon code PIN est saisi sur l'écran de blocage.",
+        onSelect: () => push(limitChoiceView("Prolongation", EXTENSION_CHOICES, () => limitState.config.extension, (v) => saveConfig({ extension: v }), "Temps ajouté après un code PIN correct.")) },
+      { label: "Code PIN", value: limitState.has_pin ? "Défini" : "Aucun", chevron: true, icon: "hourglass",
+        desc: "Protège les limites et débloque l'écran de blocage.", onSelect: () => push(pinSettingsView) },
+    ];
   }
 
   // ---------- données ----------
@@ -439,8 +597,20 @@ export function render(root, catalog, env) {
     const row = view.rows[index];
     const preview = view.preview || {};
     dom.card.textContent = "";
-    dom.card.className = "panel__card" + (row && row.image ? " panel__card--image" : "");
-    if (row && row.image) {
+    dom.card.className = "panel__card" + (view.chart ? " panel__card--chart" : (row && row.image ? " panel__card--image" : ""));
+    if (view.chart) {
+      const wrap = el("div", "chart");
+      view.chart.forEach((b) => {
+        const col = el("div", "chart__col" + (b.today ? " chart__col--today" : ""));
+        col.appendChild(el("div", "chart__value", shortDuration(b.seconds)));
+        const bar = el("div", "chart__bar");
+        bar.style.height = b.height + "px";
+        col.appendChild(bar);
+        col.appendChild(el("div", "chart__label", b.label));
+        wrap.appendChild(col);
+      });
+      dom.card.appendChild(wrap);
+    } else if (row && row.image) {
       const img = el("img", "panel__image"); img.src = row.image; dom.card.appendChild(img);
     } else {
       dom.card.appendChild(svgSpan((row && row.icon) || preview.icon || "sliders", "panel__glyph"));
@@ -483,6 +653,71 @@ export function render(root, catalog, env) {
     paintList();
   }
 
+  const PIN_KEYS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "back", "0", "ok"];
+  const pinKeyAt = (r, c) => (r === 4 ? "cancel" : PIN_KEYS[r * 3 + c]);
+
+  function paintPin() {
+    const pos = grid.position;
+    dom.keys.forEach((k) => k.node.classList.toggle("pinkey--focused", k.r === pos.row && k.c === pos.col));
+    dom.dots.forEach((d, i) => d.classList.toggle("pin__dot--on", i < top().pin.length));
+  }
+
+  function pressPinKey(key) {
+    const e = top();
+    if (key === "ok") {
+      if (e.pin.length < view.minLength) return;
+      view.onSubmit(e.pin).then((res) => {
+        if (!res.ok && top() === e) { e.pin = ""; e.msg = res.error || "Code incorrect."; show(); }
+      });
+      return;
+    }
+    if (key === "cancel") { pinCancel(); return; }
+    e.pin = pinPress(e.pin, key);
+    e.msg = "";
+    paintPin();
+    const msg = document.querySelector(".pin__message");
+    if (msg) msg.textContent = view.message;
+  }
+
+  function pinCancel() {
+    if (view.onCancel) view.onCancel();
+    else if (view.cancel) { stack.pop(); show(); }
+  }
+
+  function buildPin() {
+    const e = top();
+    const scr = el("div", "screen screen--pin");
+    scr.appendChild(el("div", "pin__title", view.title));
+    scr.appendChild(el("div", "pin__message" + (e.msg ? " pin__message--error" : ""), e.msg || view.message));
+    const dotsEl = el("div", "pin__dots");
+    const dots = [];
+    for (let i = 0; i < 8; i++) { const d = el("span", "pin__dot"); dotsEl.appendChild(d); dots.push(d); }
+    scr.appendChild(dotsEl);
+    const pad = el("div", "pin__pad");
+    const rows = view.cancel ? [3, 3, 3, 3, 1] : [3, 3, 3, 3];
+    const keys = [];
+    rows.forEach((n, r) => {
+      const rowEl = el("div", "pin__row");
+      for (let c = 0; c < n; c++) {
+        const key = pinKeyAt(r, c);
+        const label = key === "back" ? "⌫" : (key === "ok" ? "OK" : (key === "cancel" ? view.cancel : key));
+        const node = el("div", "pinkey" + (key === "cancel" ? " pinkey--wide" : ""), label);
+        node.onmousemove = (ev) => { if ((ev.movementX || ev.movementY)) { grid.setPosition(r, c); paintPin(); } };
+        node.onclick = () => pressPinKey(key);
+        rowEl.appendChild(node);
+        keys.push({ node, r, c });
+      }
+      pad.appendChild(rowEl);
+    });
+    scr.appendChild(pad);
+    scr.appendChild(el("div", "status", status));
+    root.appendChild(scr);
+    grid = createGrid(rows);
+    grid.setPosition(1, 1);
+    dom = { dots, keys };
+    paintPin();
+  }
+
   function show() {
     const entry = top();
     view = entry.build();
@@ -491,7 +726,7 @@ export function render(root, catalog, env) {
     }
     document.body.classList.toggle("in-settings", view.kind === "list");
     root.textContent = "";
-    if (view.kind === "grid") buildGrid(); else buildList();
+    if (view.kind === "grid") buildGrid(); else if (view.kind === "pin") buildPin(); else buildList();
   }
 
   // ---------- réorganisation des tuiles ----------
@@ -533,11 +768,14 @@ export function render(root, catalog, env) {
   }
 
   function goBack() {
+    if (top().noBack) return;
+    if (view.kind === "pin") { pinCancel(); return; }
     if (handleBack(stack) === "pop") { stack.pop(); reordering = false; show(); }
   }
 
   function selectCurrent() {
     let entry;
+    if (view.kind === "pin") { const p = grid.position; pressPinKey(pinKeyAt(p.row, p.col)); return; }
     if (view.kind === "grid") { const pos = grid.position; entry = view.rows[pos.row].entries[pos.col]; }
     else entry = view.rows[top().index];
     if (entry && entry.onSelect) entry.onSelect();
@@ -551,15 +789,20 @@ export function render(root, catalog, env) {
   show();
   scheduleClock();
   setInterval(() => { if (onHome()) refreshScreenTime(); }, 15000);
+  setInterval(refreshLimits, 10000);
+  document.addEventListener("webOSRelaunch", refreshLimits);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshLimits(); });
+  refreshLimits();
   loadApps();
 
   document.addEventListener("keydown", (ev) => {
     const action = keyAction(ev);
     if (!action) return;
+    if (action.type === "digit") { if (view.kind === "pin") pressPinKey(action.digit); return; }
     if (action.type === "select") {
       if (ev.repeat) return;
       if (reordering) { exitReorder(); swallowSelectUp = true; return; }
-      if (view.kind === "list") { swallowSelectUp = true; selectCurrent(); return; } // pas d'appui long dans les menus
+      if (view.kind === "list" || view.kind === "pin") { swallowSelectUp = true; selectCurrent(); return; } // pas d'appui long dans les menus
       swallowSelectUp = false;
       longFired = false;
       clearTimeout(pressTimer);
@@ -573,6 +816,7 @@ export function render(root, catalog, env) {
       return;
     }
     if (action.type === "move") {
+      if (view.kind === "pin") { grid.move(action.dir); paintPin(); return; }
       if (action.dir === "left" && !onHome() && (view.kind === "list" || grid.position.col === 0)) { goBack(); return; }
       if (view.kind === "grid") { grid.move(action.dir); top().pos = grid.position; paintGrid(); }
       else {
