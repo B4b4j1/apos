@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validWallpapers, pickWallpaper, readChoice, saveChoice, WALLPAPER_STORAGE_KEY } from "../js/wallpaper.js";
+import { validWallpapers, pickWallpaper, readChoice, saveChoice, resolveMode, WALLPAPER_STORAGE_KEY } from "../js/wallpaper.js";
 
 function fakeStorage() {
   const data = {};
@@ -72,5 +72,37 @@ describe("wallpaper choice storage", () => {
     expect(readChoice(broken)).toBeNull();
     expect(saveChoice(broken, "foret")).toBe(false);
     expect(saveChoice(undefined, "foret")).toBe(false);
+  });
+});
+
+describe("validWallpapers thumbs", () => {
+  it("keeps a local thumb and drops a non-local one while keeping the wallpaper", () => {
+    const { wallpapers } = validWallpapers([
+      { id: "a", title: "A", src: "assets/wallpapers/a.jpg", thumb: "assets/wallpapers/a-thumb.jpg" },
+      { id: "b", title: "B", src: "assets/wallpapers/b.jpg", thumb: "https://evil.test/t.jpg" },
+    ]);
+    expect(wallpapers[0].thumb).toBe("assets/wallpapers/a-thumb.jpg");
+    expect(wallpapers[1].thumb).toBeUndefined();
+  });
+});
+
+describe("resolveMode", () => {
+  const one = [{ id: "a", title: "A", src: "assets/wallpapers/a.jpg" }];
+  const many = one.concat([{ id: "b", title: "B", src: "assets/wallpapers/b.jpg" }]);
+  it("defaults to a slideshow when several wallpapers exist and nothing was chosen", () => {
+    expect(resolveMode(null, many)).toEqual({ type: "slideshow" });
+  });
+  it("defaults to the single wallpaper, or none, when fewer than two exist", () => {
+    expect(resolveMode(null, one)).toEqual({ type: "single", wallpaper: one[0] });
+    expect(resolveMode(null, [])).toEqual({ type: "none" });
+  });
+  it("honours an explicit choice of none, slideshow or a given wallpaper", () => {
+    expect(resolveMode("", many)).toEqual({ type: "none" });
+    expect(resolveMode("slideshow", many)).toEqual({ type: "slideshow" });
+    expect(resolveMode("b", many)).toEqual({ type: "single", wallpaper: many[1] });
+  });
+  it("falls back to the default when the chosen wallpaper disappeared", () => {
+    expect(resolveMode("gone", many)).toEqual({ type: "slideshow" });
+    expect(resolveMode("slideshow", [])).toEqual({ type: "none" });
   });
 });

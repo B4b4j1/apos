@@ -13,14 +13,30 @@ function isWallpaper(w) {
 
 export function validWallpapers(list) {
   const warnings = [];
-  const wallpapers = (Array.isArray(list) ? list : []).filter((w) => {
+  const wallpapers = [];
+  (Array.isArray(list) ? list : []).forEach((w) => {
     if (!isWallpaper(w)) {
       warnings.push("fond d'écran ignoré : entrée invalide ou source non locale");
-      return false;
+      return;
     }
-    return true;
+    const entry = { id: w.id, title: w.title, src: w.src };
+    if (typeof w.thumb === "string" && LOCAL_SRC.test(w.thumb)) entry.thumb = w.thumb;
+    wallpapers.push(entry);
   });
   return { wallpapers, warnings };
+}
+
+export const SLIDESHOW_ID = "slideshow";
+
+// saved : null = jamais choisi, "" = aucun fond, "slideshow" = diaporama, sinon identifiant d'une photo.
+export function resolveMode(saved, wallpapers) {
+  if (saved === "") return { type: "none" };
+  if (saved === SLIDESHOW_ID && wallpapers.length > 0) return { type: "slideshow" };
+  const chosen = pickWallpaper(wallpapers, saved);
+  if (chosen) return { type: "single", wallpaper: chosen };
+  if (wallpapers.length > 1) return { type: "slideshow" };
+  if (wallpapers.length === 1) return { type: "single", wallpaper: wallpapers[0] };
+  return { type: "none" };
 }
 
 export function pickWallpaper(list, id) {

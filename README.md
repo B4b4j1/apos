@@ -10,14 +10,17 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 5. Désactiver les services : `scripts/device/disable-telemetry.sh --dry-run` puis sans l'option.
 6. Packager et installer le launcher : `scripts/app/package.sh` puis `scripts/device/install-launcher.sh <ip-tv>`.
 
-## Fonds d'écran (launcher)
-- Déposez vos images (jpg, png, webp) dans `app/assets/wallpapers/`.
-- Déclarez chaque image dans `app/config/wallpapers.js` (`id`, `title`, `src` relatif à `app/`).
-- Dans l'app : Réglages, puis choisissez le fond. Le choix est mémorisé dans le stockage local de l'app.
-- Aucune image n'est téléchargée : `scripts/app/package.sh` échoue si une référence `http(s)://` se trouve dans le paquet.
+## Fonds d'écran et diaporama (launcher)
+- Déposez vos photos originales dans `wallpapers-src/` (non versionné : elles sont lourdes et contiennent la position GPS).
+- `build/venv/bin/python scripts/app/prepare_wallpapers.py wallpapers-src app/assets/wallpapers` les convertit en 1920x1080 léger (sans EXIF) avec vignettes et écrit `index.json` (non versionné aussi).
+- Au lancement, l'app lit `assets/wallpapers/index.json` : diaporama par défaut (nouvelle photo toutes les 60 s, fondu enchaîné). Dans le dock : Réglages ApOS pour choisir Diaporama, Aucun fond ou une photo fixe.
+- Des fonds peuvent aussi être déclarés à la main dans `app/config/wallpapers.js`. Aucune image n'est téléchargée : `scripts/app/package.sh` échoue si une référence `http(s)://` se trouve dans le paquet.
+
+## Liste des apps (launcher)
+- Une app web ne peut pas lister les apps via Luna. `bash scripts/device/refresh-apps.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin) génère sur la TV `config/launchpoints.json` et copie les icônes. À relancer après l'ajout ou la suppression d'une app, ou après une réinstallation d'ApOS.
 
 ## Tests
-- Python : `python -m pytest tools blocklist`
+- Python : `build/venv/bin/python -m pytest tools blocklist scripts` (venv à créer dans `build/` avec pytest et pillow)
 - JavaScript : `npm test`
 - Scripts shell : `bats scripts/net/tests` et `bash scripts/device/tests/*.sh`
 

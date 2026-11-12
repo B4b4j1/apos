@@ -5,13 +5,15 @@ import { keyAction } from "./keys.js";
 import { WALLPAPERS } from "../config/wallpapers.js";
 import { FALLBACK_APPS } from "../config/fallback-apps.js";
 import { DOCK } from "../config/dock.js";
-import { validWallpapers, pickWallpaper, readChoice, saveChoice } from "./wallpaper.js";
+import { validWallpapers, readChoice, saveChoice, resolveMode, SLIDESHOW_ID } from "./wallpaper.js";
+import { createSlideshow } from "./slideshow.js";
 import { launchApp } from "./luna.js";
 import { normalizeApps } from "./apps.js";
 import { formatTime } from "./clock.js";
 
 const TILE_STEP = 236 + 28;
 const VISIBLE = 6;
+const SLIDESHOW_MS = 60000; // une nouvelle photo toutes les 60 s
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -55,9 +57,40 @@ export function render(root, catalog, env) {
   let screen = null; // { rows: [{kind, entries}], grid, rowEls }
   let grid = null;
 
-  function setBackground(w) {
-    document.body.style.backgroundImage = w ? `url("${w.src}")` : "";
-    document.body.classList.toggle("has-wallpaper", !!w);
+  // Deux calques superposés : la nouvelle photo apparaît en fondu par-dessus l'ancienne.
+  let layers = null;
+  let front = 0;
+  let slideTimer = null;
+
+  function showImage(src) {
+    if (!layers) {
+      layers = [el("div", "bg"), el("div", "bg")];
+      layers.forEach((l) => document.body.insertBefore(l, document.body.firstChild));
+    }
+    if (!src) {
+      layers.forEach((l) => l.classList.remove("bg--visible"));
+      document.body.classList.remove("has-wallpaper");
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      const back = layers[1 - front];
+      back.style.backgroundImage = 'url("' + src + '")';
+      back.classList.add("bg--visible");
+      layers[front].classList.remove("bg--visible");
+      front = 1 - front;
+      document.body.classList.add("has-wallpaper");
+    };
+    img.src = src;
+  }
+
+  function applyMode(mode) {
+    if (slideTimer) { clearInterval(slideTimer); slideTimer = null; }
+    if (mode.type === "none") { showImage(null); return; }
+    if (mode.type === "single") { showImage(mode.wallpaper.src); return; }
+    const slides = createSlideshow(wallpapers);
+    showImage(slides.next().src);
+    slideTimer = setInterval(() => showImage(slides.next().src), SLIDESHOW_MS);
   }
 
   function say(text) {
@@ -88,11 +121,18 @@ export function render(root, catalog, env) {
   }
 
   function settingsRows() {
-    const saved = readChoice(storage);
-    const none = { label: "Aucun fond", monogram: "∅", badge: !saved, onSelect: () => chooseWallpaper(null) };
-    const choices = wallpapers.map((w) => ({ label: w.title, image: w.src, badge: w.id === saved, onSelect: () => chooseWallpaper(w) }));
+    const mode = resolveMode(readChoice(storage), wallpapers);
+    const slideshow = { label: "Diaporama", monogram: "▶", badge: mode.type === "slideshow", onSelect: () => chooseWallpaper(SLIDESHOW_ID) };
+    const none = { label: "Aucun fond", monogram: "∅", badge: mode.type === "none", onSelect: () => chooseWallpaper("") };
+    const choices = wallpapers.map((w) => ({
+      label: w.title,
+      image: w.thumb || w.src,
+      badge: mode.type === "single" && mode.wallpaper.id === w.id,
+      onSelect: () => chooseWallpaper(w.id),
+    }));
+    const entries = (wallpapers.length > 0 ? [slideshow] : []).concat([none], choices);
     const back = { label: "Retour", monogram: "←", onSelect: goBack };
-    return [{ kind: "apps", entries: [none].concat(choices) }, { kind: "dock", entries: [back] }];
+    return [{ kind: "apps", entries }, { kind: "dock", entries: [back] }];
   }
 
   function currentRows() {
@@ -100,9 +140,9 @@ export function render(root, catalog, env) {
     return [{ kind: "apps", entries: appEntries(), loading: apps === null }, { kind: "dock", entries: dockEntries() }];
   }
 
-  function chooseWallpaper(w) {
-    saveChoice(storage, w ? w.id : "");
-    setBackground(w);
+  function chooseWallpaper(choice) {
+    saveChoice(storage, choice);
+    applyMode(resolveMode(choice, wallpapers));
     show(true);
   }
 
@@ -167,7 +207,7 @@ export function render(root, catalog, env) {
       .then(() => { if (stack[stack.length - 1] === "home") show(); });
   }
 
-  setBackground(pickWallpaper(wallpapers, readChoice(storage)));
+  applyMode(resolveMode(readChoice(storage), wallpapers));
   show();
   loadApps();
   setInterval(() => { const c = document.querySelector(".clock"); if (c) c.textContent = formatTime(new Date()); }, 20000);
@@ -186,15 +226,22 @@ export function render(root, catalog, env) {
   });
 }
 
+function fetchJson(url) {
+  return fetch(url).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+}
+
 function start() {
   const root = document.getElementById("root");
   if (!root) return;
   let storage = null;
   try { storage = window.localStorage; } catch (err) { storage = null; }
-  fetch("config/catalog.json")
-    .then((r) => (r.ok ? r.text() : ""))
-    .catch(() => "")
-    .then((text) => render(root, loadCatalog(text), { storage }));
+  const catalogText = fetch("config/catalog.json").then((r) => (r.ok ? r.text() : "")).catch(() => "");
+  // assets/wallpapers/index.json est généré par scripts/app/prepare_wallpapers.py (photos de l'utilisateur).
+  const photos = fetchJson("assets/wallpapers/index.json");
+  Promise.all([catalogText, photos]).then((res) => {
+    const list = WALLPAPERS.concat(Array.isArray(res[1]) ? res[1] : []);
+    render(root, loadCatalog(res[0]), { storage, wallpapers: list });
+  });
 }
 
 if (typeof document !== "undefined") start();

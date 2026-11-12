@@ -3,3 +3,10 @@ backups/
 dist/
 node_modules/
 build/
+
+# Photos personnelles : originaux et versions redimensionnées ne sont pas versionnés
+wallpapers-src/
+app/assets/wallpapers/*
+!app/assets/wallpapers/.gitkeep
+app/assets/icons/
+.DS_Store
