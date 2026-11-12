@@ -1,0 +1,5 @@
+Nov 12 10:00:01 dnsmasq[1]: query[A] ad.example-lg.test from 192.168.1.50
+Nov 12 10:00:02 dnsmasq[1]: query[AAAA] ad.example-lg.test from 192.168.1.50
+Nov 12 10:00:03 dnsmasq[1]: query[A] tracker.example-lg.test from 192.168.1.50
+Nov 12 10:00:04 dnsmasq[1]: query[A] www.wikipedia.org from 192.168.1.20
+Nov 12 10:00:05 dnsmasq[1]: reply ad.example-lg.test is 0.0.0.0
