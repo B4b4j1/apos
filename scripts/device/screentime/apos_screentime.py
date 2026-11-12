@@ -383,6 +383,13 @@ class Service:
         self.luna("luna://com.webos.applicationManager/launch", {"id": LG_HOME_ID})
 
     def home_tick(self):
+        """Filet de sécurité (interrogation) en plus de l'abonnement instantané de home_watch()."""
+        if not self.config["home_redirect"]:
+            return
+        app = (self.luna("luna://com.webos.applicationManager/getForegroundAppInfo", {}) or {}).get("appId") or ""
+        self.home_event(app)
+
+    def home_event(self, app):
         with self.lock:
             if not self.config["home_redirect"]:
                 return
@@ -391,7 +398,6 @@ class Service:
                 if now < self.home_paused_until:
                     return
                 self.home_paused_until = None
-            app = (self.luna("luna://com.webos.applicationManager/getForegroundAppInfo", {}) or {}).get("appId") or ""
             if app != LG_HOME_ID:
                 if self.home_pass == "in" or (self.home_pass == "pending" and now > self.home_pass_until):
                     self.home_pass = None
@@ -624,9 +630,31 @@ def main():
                 service.home_tick()
             except Exception as err:
                 sys.stderr.write("home: %r\n" % (err,))
-            time.sleep(1)
+            time.sleep(2)
+
+    def home_watch():
+        """Abonnement au premier plan : l'accueil LG est remplacé par ApOS dès qu'il apparaît (sans attendre l'interrogation)."""
+        while True:
+            try:
+                proc = subprocess.Popen(["luna-send", "-i", "luna://com.webos.applicationManager/getForegroundAppInfo", '{"subscribe":true}'],
+                                        stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
+                for line in proc.stdout:
+                    start = line.find("{")
+                    if start < 0:
+                        continue
+                    try:
+                        data = json.JSONDecoder().raw_decode(line[start:])[0]
+                    except ValueError:
+                        continue
+                    if isinstance(data, dict) and isinstance(data.get("appId"), str):
+                        service.home_event(data["appId"])
+                proc.wait()
+            except Exception as err:
+                sys.stderr.write("home_watch: %r\n" % (err,))
+            time.sleep(2)
 
     threading.Thread(target=home_loop, daemon=True).start()
+    threading.Thread(target=home_watch, daemon=True).start()
     last_restore = last_backup = time.time()
     while True:
         try:

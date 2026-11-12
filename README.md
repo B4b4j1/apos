@@ -37,7 +37,7 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 ## Bouton Home de la télécommande
 
 Réglages > Système > « Bouton Home de la télécommande » : ApOS (le bouton Home ramène vers ApOS) ou webOS (comportement d'origine, par défaut).
-Le service de la TV surveille l'app au premier plan chaque seconde ; si l'accueil LG apparaît, il relance ApOS (un bref passage de l'accueil LG est visible).
+Le service de la TV s'abonne à l'app au premier plan (interrogation toutes les 2 s en secours) ; dès que l'accueil LG apparaît, il relance ApOS (l'accueil LG reste visible environ 0,3 s).
 Le bouton « Retour vers webOS » (icône maison, à droite des réglages) ouvre l'accueil LG sans redirection. Garde-fou : après 5 redirections en 30 s,
 la redirection se met en pause 10 minutes. Désactivation d'urgence : `ssh root@<tv> "sed -i 's/\"home_redirect\": true/\"home_redirect\": false/' /var/lib/webosbrew/apos-screentime.json; kill \$(cat /tmp/apos-screentime.pid)"`.
 
