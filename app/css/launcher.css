@@ -1,5 +1,66 @@
-html, body { margin: 0; height: 100%; background: #111; color: #fff; font-family: sans-serif; }
-body { background-size: cover; background-position: center; background-repeat: no-repeat; }
-#root { display: flex; flex-wrap: wrap; align-content: center; gap: 2rem; padding: 4rem; box-sizing: border-box; }
-.tile { width: 22rem; height: 12rem; display: flex; align-items: center; justify-content: center; background: #223; border: 0.4rem solid transparent; border-radius: 1rem; font-size: 2.2rem; }
-.tile.focused { border-color: #fc0; background: #334; }
+/* Design inspiré de Lumen (ammar027/lumen-webos, licence MIT) : fond sombre en dégradés,
+   tuiles 236x142 aux coins arrondis, tuile focalisée agrandie, libellé visible au focus,
+   dock de petites tuiles en bas, horloge en pastille. Compatible Chromium 79 (pas de gap, inset, aspect-ratio). */
+:root {
+  --bg: #0a0f1e;
+  --text: #eeeeee;
+  --text-muted: #aaaaaa;
+  --tile-bg: rgba(255, 255, 255, 0.10);
+  --tile-bg-focus: rgba(255, 255, 255, 0.18);
+  --edge: 140px;
+  --tile-w: 236px;
+  --tile-h: 142px;
+  --tile-gap: 28px;
+  --tile-radius: 34px;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; width: 1920px; height: 1080px; overflow: hidden; background: #000 center / cover no-repeat; color: var(--text); font-family: "Helvetica Neue", Arial, sans-serif; user-select: none; }
+
+.screen {
+  position: absolute; left: 0; top: 0; width: 100%; height: 100%;
+  background:
+    radial-gradient(ellipse 60% 55% at 18% 18%, rgba(70, 120, 255, 0.45) 0%, rgba(70, 120, 255, 0) 70%),
+    radial-gradient(ellipse 55% 60% at 85% 30%, rgba(170, 80, 230, 0.38) 0%, rgba(170, 80, 230, 0) 70%),
+    radial-gradient(ellipse 70% 50% at 55% 100%, rgba(30, 170, 190, 0.34) 0%, rgba(30, 170, 190, 0) 70%),
+    var(--bg);
+}
+.has-wallpaper .screen { background: none; }
+.screen::after { content: ""; position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0) 40%, rgba(0, 0, 0, 0.7) 100%); }
+
+.clock { position: absolute; right: var(--edge); top: 84px; z-index: 2; padding: 10px 26px; border-radius: 40px;
+  background: rgba(255, 255, 255, 0.14); box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.2);
+  font-size: 44px; font-weight: 200; letter-spacing: 0.02em; }
+.title { position: absolute; left: var(--edge); top: 84px; z-index: 2; font-size: 40px; font-weight: 300; }
+
+.rows { position: absolute; left: var(--edge); right: var(--edge); top: 560px; z-index: 2; }
+.row { margin-bottom: 40px; }
+.row__viewport { overflow: hidden; padding: 40px 70px 90px; margin: -40px -70px -90px; opacity: 0.6; transition: opacity 160ms ease-out; }
+.row--focused .row__viewport { opacity: 1; }
+.row__track { display: flex; flex-direction: row; transition: transform 260ms cubic-bezier(0.2, 0.7, 0.2, 1); will-change: transform; }
+.row__empty { font-size: 24px; color: var(--text-muted); height: var(--tile-h); line-height: var(--tile-h); }
+
+.tile { flex: 0 0 auto; width: var(--tile-w); margin-right: var(--tile-gap); text-align: center; }
+.tile__box { position: relative; width: var(--tile-w); height: var(--tile-h); border-radius: var(--tile-radius); background: var(--tile-bg);
+  overflow: hidden; transform: scale(1); transition: transform 160ms ease-out; }
+.tile--focused .tile__box { transform: scale(1.16) translateY(-6px); background: var(--tile-bg-focus); z-index: 1;
+  box-shadow: 0 34px 56px rgba(0, 0, 0, 0.5), 0 10px 20px rgba(0, 0, 0, 0.3); }
+.tile__image { position: absolute; left: 0; top: 0; width: 100%; height: 100%; object-fit: cover; }
+.tile__image--icon { left: 24%; top: 12%; width: 52%; height: 76%; object-fit: contain; }
+.tile__monogram { position: absolute; left: 0; top: 0; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; font-size: 56px; font-weight: 600; }
+.tile__badge { position: absolute; right: 12px; top: 12px; width: 34px; height: 34px; border-radius: 50%; background: #eee; color: #000;
+  display: flex; align-items: center; justify-content: center; font-size: 22px; font-weight: 700; }
+.tile__label { width: 264px; height: 46px; margin: 26px 0 0 -14px; line-height: 1.2; font-size: 19px; overflow: hidden; opacity: 0;
+  transition: opacity 160ms ease-out; text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8); }
+.tile--focused .tile__label { opacity: 1; }
+
+.row--dock { position: absolute; left: 0; right: 0; bottom: 56px; margin: 0; z-index: 2;
+  --tile-w: 84px; --tile-h: 84px; --tile-gap: 26px; --tile-radius: 24px; }
+.dockwrap { position: absolute; left: var(--edge); right: var(--edge); bottom: 0; height: 200px; z-index: 2; }
+.row--dock .row__viewport { padding: 30px 70px 70px; margin: -30px -70px -70px; opacity: 0.7; }
+.row--dock.row--focused .row__viewport { opacity: 1; }
+.row--dock .tile--focused .tile__box { transform: scale(1.22) translateY(-6px); }
+.row--dock .tile__monogram { font-size: 34px; }
+.row--dock .tile__label { margin-top: 12px; font-size: 22px; }
+
+.status { position: absolute; left: var(--edge); bottom: 18px; z-index: 3; font-size: 18px; color: var(--text-muted); }
