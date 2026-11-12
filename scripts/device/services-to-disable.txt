@@ -1,0 +1,2 @@
+# Services Luna de collecte à désactiver (un nom par ligne).
+# Liste remplie après relevé sur la TV (Tâche 0) et audit (Tâche 1).
