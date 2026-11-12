@@ -1,6 +1,0 @@
-{
-  "apps": [
-    { "id": "accueil", "title": "Accueil", "kind": "app", "target": "com.apos.launcher" }
-  ],
-  "media": []
-}

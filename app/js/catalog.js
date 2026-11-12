@@ -1,26 +1,45 @@
-import defaults from "../config/default-catalog.json" with { type: "json" };
+import { DEFAULT_CATALOG } from "../config/default-catalog.js";
 
-const REMOTE = /^(https?:|\/\/)/i;
+// Cible locale : identifiant d'app ou chemin, sans schéma ni espace.
+const LOCAL_TARGET = /^[A-Za-z0-9._/-]+$/;
+
+function fallback(reason) {
+  return {
+    apps: DEFAULT_CATALOG.apps.slice(),
+    media: DEFAULT_CATALOG.media.slice(),
+    warnings: [reason],
+  };
+}
 
 function validEntry(e) {
-  return e && typeof e.id === "string" && typeof e.title === "string"
+  return e !== null && typeof e === "object"
+    && typeof e.id === "string" && typeof e.title === "string"
     && (e.kind === "app" || e.kind === "folder") && typeof e.target === "string";
 }
 
 export function loadCatalog(text) {
-  const warnings = [];
   let parsed;
   try {
     if (!text) throw new Error("configuration vide");
     parsed = JSON.parse(text);
-    if (parsed === null || typeof parsed !== "object") throw new Error("format attendu : objet JSON");
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("format attendu : objet JSON");
+    }
   } catch (err) {
-    return { apps: defaults.apps.slice(), media: defaults.media.slice(), warnings: [`Configuration par défaut utilisée : ${err.message}`] };
+    return fallback(`Configuration par défaut utilisée : ${err.message}`);
   }
-  const keep = (list, label) => (Array.isArray(list) ? list : []).filter(e => {
+
+  const warnings = [];
+  const keep = (list, label) => (Array.isArray(list) ? list : []).filter((e) => {
     if (!validEntry(e)) { warnings.push(`${label} invalide ignoré`); return false; }
-    if (REMOTE.test(e.target)) { warnings.push(`${label} « ${e.id} » ignoré : cible distante`); return false; }
+    if (!LOCAL_TARGET.test(e.target)) { warnings.push(`${label} « ${e.id} » ignoré : cible distante ou non locale`); return false; }
     return true;
   });
-  return { apps: keep(parsed.apps, "app"), media: keep(parsed.media, "média"), warnings };
+
+  const apps = keep(parsed.apps, "app");
+  const media = keep(parsed.media, "média");
+  if (apps.length === 0) {
+    return { apps: DEFAULT_CATALOG.apps.slice(), media, warnings: warnings.concat("Aucune app valide : catalogue par défaut utilisé") };
+  }
+  return { apps, media, warnings };
 }
