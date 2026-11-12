@@ -8,7 +8,8 @@ def build(entries, allowlist):
         if domain in allowlist:
             continue
         out.add(domain)
-    return [f"0.0.0.0 {d}" for d in sorted(out)]
+    # IPv4 et IPv6 : la TV a une connectivité IPv6, un blocage IPv4 seul serait contourné.
+    return [line for d in sorted(out) for line in (f"0.0.0.0 {d}", f":: {d}")]
 
 def load_entries(path):
     rows = []

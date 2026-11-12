@@ -2,7 +2,7 @@ from blocklist.build_blocklist import build
 
 def test_blocks_domains_marked_block():
     entries = [("ad.example-lg.test", "publicité", "bloquer")]
-    assert build(entries, allowlist=set()) == ["0.0.0.0 ad.example-lg.test"]
+    assert build(entries, allowlist=set()) == ["0.0.0.0 ad.example-lg.test", ":: ad.example-lg.test"]
 
 def test_skips_domains_marked_allow():
     entries = [("update.example-lg.test", "mise à jour", "autoriser")]
@@ -18,4 +18,4 @@ def test_output_is_sorted_and_deduplicated():
         ("a.test", "publicité", "bloquer"),
         ("a.test", "publicité", "bloquer"),
     ]
-    assert build(entries, allowlist=set()) == ["0.0.0.0 a.test", "0.0.0.0 b.test"]
+    assert build(entries, allowlist=set()) == ["0.0.0.0 a.test", ":: a.test", "0.0.0.0 b.test", ":: b.test"]

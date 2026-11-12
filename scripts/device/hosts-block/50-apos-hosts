@@ -1,0 +1,31 @@
+#!/bin/sh
+# ApOS : bloque les domaines de publicité / ACR / télémétrie LG en les ajoutant à /etc/hosts.
+# /etc/hosts est recréé à chaque démarrage : le blocage disparaît au prochain redémarrage
+# si ce script est supprimé (/var/lib/webosbrew/init.d/50-apos-hosts).
+# Usage : 50-apos-hosts [remove]
+HOSTS_FILE="${HOSTS_FILE:-/etc/hosts}"
+LIST="${APOS_LIST:-/var/lib/webosbrew/apos-hosts.block}"
+BEGIN="# >>> apos block"
+END="# <<< apos block"
+
+strip_block() {
+    # fichier temporaire dans /tmp : le dossier de /etc/hosts peut être en lecture seule
+    tmp="${TMPDIR:-/tmp}/apos-hosts.$$"
+    sed -e "\|$BEGIN|,\|$END|d" "$HOSTS_FILE" > "$tmp" && cat "$tmp" > "$HOSTS_FILE"
+    rm -f "$tmp"
+}
+
+if [ "$1" = "remove" ]; then
+    strip_block
+    exit 0
+fi
+
+[ -f "$LIST" ] || exit 0
+
+# Sur la TV, /etc/hosts peut être en lecture seule : on le remplace par une copie modifiable.
+if [ "$HOSTS_FILE" = "/etc/hosts" ] && ! grep -q ' /etc/hosts tmpfs' /proc/mounts; then
+    cp /etc/hosts /tmp/hosts && mount --bind /tmp/hosts /etc/hosts || exit 1
+fi
+
+strip_block
+{ echo "$BEGIN"; cat "$LIST"; echo "$END"; } >> "$HOSTS_FILE"
