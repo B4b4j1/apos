@@ -10,6 +10,12 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 5. Désactiver les services : `scripts/device/disable-telemetry.sh --dry-run` puis sans l'option.
 6. Packager et installer le launcher : `scripts/app/package.sh` puis `scripts/device/install-launcher.sh <ip-tv>`.
 
+## Fonds d'écran (launcher)
+- Déposez vos images (jpg, png, webp) dans `app/assets/wallpapers/`.
+- Déclarez chaque image dans `app/config/wallpapers.js` (`id`, `title`, `src` relatif à `app/`).
+- Dans l'app : Réglages, puis choisissez le fond. Le choix est mémorisé dans le stockage local de l'app.
+- Aucune image n'est téléchargée : `scripts/app/package.sh` échoue si une référence `http(s)://` se trouve dans le paquet.
+
 ## Tests
 - Python : `python -m pytest tools blocklist`
 - JavaScript : `npm test`

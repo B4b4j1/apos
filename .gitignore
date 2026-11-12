@@ -2,3 +2,4 @@
 backups/
 dist/
 node_modules/
+build/

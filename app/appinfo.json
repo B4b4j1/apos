@@ -7,5 +7,6 @@
   "title": "ApOS",
   "icon": "icon.png",
   "requiredPermissions": [],
-  "resolution": "1920x1080"
+  "resolution": "1920x1080",
+  "requiredACG": []
 }

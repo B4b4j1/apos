@@ -1,37 +1,89 @@
 import { createFocus } from "./focus.js";
 import { handleBack } from "./back.js";
 import { loadCatalog } from "./catalog.js";
+import { WALLPAPERS } from "../config/wallpapers.js";
+import { validWallpapers, pickWallpaper, readChoice, saveChoice } from "./wallpaper.js";
+import { keyAction } from "./keys.js";
 
-const KEY_TO_DIR = {
-  ArrowLeft: "left", ArrowRight: "right", ArrowUp: "up", ArrowDown: "down",
-  37: "left", 38: "up", 39: "right", 40: "down",
-};
-// 461 : touche Retour LG (webOS). Escape : clavier de test.
-const BACK_KEYS = { 461: true, Escape: true, Backspace: true };
+
 const COLUMNS = 3;
 
-export function render(root, catalog) {
-  root.textContent = "";
-  const items = catalog.apps;
-  const focus = createFocus(items.length, COLUMNS);
-  const tiles = items.map((item) => {
-    const el = document.createElement("div");
-    el.className = "tile";
-    el.textContent = item.title;
-    root.appendChild(el);
-    return el;
-  });
-  const paint = () => tiles.forEach((el, i) => el.classList.toggle("focused", i === focus.index));
-  paint();
+function setBackground(w) {
+  document.body.style.backgroundImage = w ? `url("${w.src}")` : "";
+}
 
-  // Pile d'écrans : l'accueil est seul pour l'instant, donc Retour à la racine ne fait rien.
-  const stack = ["home"];
+// env = { storage, wallpapers } ; injectés pour les tests, sinon valeurs réelles.
+export function render(root, catalog, env = {}) {
+  const storage = env.storage;
+  const wallpapers = validWallpapers(env.wallpapers || WALLPAPERS).wallpapers;
+  const stack = [];
+  let current = null; // { entries, focus, tiles }
+
+  function paint() {
+    current.tiles.forEach((el, i) => el.classList.toggle("focused", i === current.focus.index));
+  }
+
+  function show(entries) {
+    root.textContent = "";
+    const tiles = entries.map((e) => {
+      const el = document.createElement("div");
+      el.className = "tile";
+      el.textContent = e.label;
+      root.appendChild(el);
+      return el;
+    });
+    current = { entries, focus: createFocus(entries.length, COLUMNS), tiles };
+    paint();
+  }
+
+  function chooseWallpaper(w) {
+    saveChoice(storage, w ? w.id : "");
+    setBackground(w);
+    // Même nombre d'entrées : on rafraîchit les libellés sans perdre le focus.
+    current.entries = settingsEntries();
+    current.tiles.forEach((el, i) => { el.textContent = current.entries[i].label; });
+    paint();
+  }
+
+  function homeEntries() {
+    return catalog.apps.map((a) => ({ label: a.title }))
+      .concat({ label: "Réglages", onSelect: () => open("settings") });
+  }
+
+  function settingsEntries() {
+    const saved = readChoice(storage);
+    const none = { label: saved ? "Aucun fond" : "✓ Aucun fond", onSelect: () => chooseWallpaper(null) };
+    const options = wallpapers.map((w) => ({
+      label: (w.id === saved ? "✓ " : "") + w.title,
+      onSelect: () => chooseWallpaper(w),
+    }));
+    return [none].concat(options);
+  }
+
+  const screens = { home: homeEntries, settings: settingsEntries };
+  const top = () => stack[stack.length - 1];
+
+  function open(name) {
+    stack.push(name);
+    show(screens[name]());
+  }
+
+  setBackground(pickWallpaper(wallpapers, readChoice(storage)));
+  stack.push("home");
+  show(screens.home());
+
   document.addEventListener("keydown", (ev) => {
-    const key = ev.key in KEY_TO_DIR ? ev.key : ev.keyCode;
-    const dir = KEY_TO_DIR[key];
-    if (dir) { focus.move(dir); paint(); return; }
-    if (BACK_KEYS[key] || BACK_KEYS[ev.keyCode]) {
-      if (handleBack(stack) === "pop") stack.pop();
+    const action = keyAction(ev);
+    if (!action) return;
+    if (action.type === "move") { current.focus.move(action.dir); paint(); return; }
+    if (action.type === "select") {
+      const entry = current.entries[current.focus.index];
+      if (entry && entry.onSelect) entry.onSelect();
+      return;
+    }
+    if (handleBack(stack) === "pop") {
+      stack.pop();
+      show(screens[top()]());
     }
   });
 }
@@ -39,10 +91,12 @@ export function render(root, catalog) {
 function start() {
   const root = document.getElementById("root");
   if (!root) return;
+  let storage = null;
+  try { storage = window.localStorage; } catch (err) { storage = null; }
   fetch("config/catalog.json")
     .then((r) => (r.ok ? r.text() : ""))
     .catch(() => "")
-    .then((text) => render(root, loadCatalog(text)));
+    .then((text) => render(root, loadCatalog(text), { storage }));
 }
 
 if (typeof document !== "undefined") start();
