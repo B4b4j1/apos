@@ -8,5 +8,6 @@
   "icon": "icon.png",
   "requiredPermissions": [],
   "resolution": "1920x1080",
-  "requiredACG": []
+  "requiredACG": [],
+  "disableBackHistoryAPI": true
 }

@@ -8,6 +8,7 @@ const PATHS = {
   appearance: '<circle cx="12" cy="12" r="9"/><path d="M12 3v18M12 8h5M12 12h6M12 16h5"/>',
   system: '<rect x="5" y="5" width="14" height="14" rx="3"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/>',
   home: '<path d="M4 11l8-7 8 7v9H4z"/>',
+  back: '<path d="M15 6l-6 6 6 6"/>',
   chevron: '<path d="M9 6l6 6-6 6"/>',
   check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   tv: '<rect x="3" y="5" width="18" height="12" rx="2.5"/><path d="M9 20h6"/>',

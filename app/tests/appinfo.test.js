@@ -12,4 +12,7 @@ describe("appinfo.json", () => {
   it("declares no network permission beyond local", () => {
     expect(info.requiredPermissions ?? []).not.toContain("network.external");
   });
+  it("receives the Back key itself instead of leaving the app", () => {
+    expect(info.disableBackHistoryAPI).toBe(true);
+  });
 });

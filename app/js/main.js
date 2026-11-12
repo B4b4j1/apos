@@ -217,7 +217,8 @@ export function render(root, catalog, env) {
 
   function sourcesView() {
     const entries = SOURCES.map((s) => ({ label: s.title, monogram: s.monogram, svg: s.icon, onSelect: launchEntry(s.launch) }));
-    return { kind: "grid", name: "sources", title: "Sources", rows: [{ kind: "apps", entries }], start: { row: 0, col: 0 } };
+    entries.unshift({ label: "Retour", svg: "back", onSelect: goBack });
+    return { kind: "grid", name: "sources", title: "Sources", rows: [{ kind: "apps", entries }], start: { row: 0, col: 1 } };
   }
 
   function setSetting(key, value) {
@@ -323,17 +324,21 @@ export function render(root, catalog, env) {
     const scr = el("div", "screen screen--grid");
     scr.appendChild(buildClock());
     if (view.title) scr.appendChild(el("div", "title", view.title));
-    const rows = view.rows.map((r) => {
+    const pointer = (node, ri, c) => {
+      node.onmousemove = (ev) => { if (!(ev.movementX || ev.movementY)) return; const p = grid.position; if (p.row !== ri || p.col !== c) { grid.setPosition(ri, c); top().pos = grid.position; paintGrid(); } };
+      node.onclick = () => { grid.setPosition(ri, c); top().pos = grid.position; selectCurrent(); };
+    };
+    const rows = view.rows.map((r, ri) => {
       if (r.kind === "top") {
         const wrap = el("div", "topbtns");
-        const tiles = r.entries.map((e) => { const b = el("div", "topbtn"); b.appendChild(svgSpan(e.icon, "topbtn__icon")); wrap.appendChild(b); return b; });
+        const tiles = r.entries.map((e, c) => { const b = el("div", "topbtn"); b.appendChild(svgSpan(e.icon, "topbtn__icon")); wrap.appendChild(b); pointer(b, ri, c); return b; });
         scr.appendChild(wrap);
         return { kind: "top", tiles };
       }
       const dock = el("div", "dock");
       const viewport = el("div", "row__viewport");
       const track = el("div", "row__track");
-      const tiles = r.entries.map((e) => { const t = buildTile(e, !document.body.classList.contains("icons-neutral")); track.appendChild(t); return t; });
+      const tiles = r.entries.map((e, c) => { const t = buildTile(e, !document.body.classList.contains("icons-neutral")); track.appendChild(t); pointer(t, ri, c); return t; });
       if (tiles.length === 0) track.appendChild(el("div", "row__empty", r.loading ? "Chargement des apps…" : "Aucune app"));
       viewport.appendChild(track);
       dock.appendChild(viewport);
@@ -378,9 +383,12 @@ export function render(root, catalog, env) {
     scr.appendChild(panel);
     const list = el("div", "slist");
     const track = el("div", "slist__track");
-    const rows = view.rows.map((r) => {
+    const rows = view.rows.map((r, i) => {
       const row = el("div", "srow");
+      row.onmousemove = (ev) => { if ((ev.movementX || ev.movementY) && top().index !== i) { top().index = i; paintList(); } };
+      row.onclick = () => { top().index = i; selectCurrent(); };
       if (r.thumb) { const img = el("img", "srow__thumb"); img.src = r.thumb; img.onerror = () => { row.removeChild(img); }; row.appendChild(img); }
+      if (r.back) row.appendChild(svgSpan("back", "srow__back"));
       row.appendChild(el("span", "srow__label", r.label));
       if (r.value) row.appendChild(el("span", "srow__value", r.value));
       if (r.check) row.appendChild(svgSpan("check", "srow__check"));
@@ -394,13 +402,17 @@ export function render(root, catalog, env) {
     root.appendChild(scr);
     dom = { rows, track, card, text };
     const entry = top();
-    entry.index = Math.max(0, Math.min(entry.index || 0, Math.max(0, view.rows.length - 1)));
+    const first = view.rows.length > 1 ? 1 : 0; // le focus démarre sur la première option, « Retour » est juste au-dessus
+    entry.index = entry.index === undefined ? first : Math.max(0, Math.min(entry.index, view.rows.length - 1));
     paintList();
   }
 
   function show() {
     const entry = top();
     view = entry.build();
+    if (view.kind === "list" && stack.length > 1) {
+      view.rows.unshift({ label: "Retour", back: true, icon: "back", desc: "Revenir à l'écran précédent (flèche gauche ou touche Retour).", onSelect: goBack });
+    }
     document.body.classList.toggle("in-settings", view.kind === "list");
     root.textContent = "";
     if (view.kind === "grid") buildGrid(); else buildList();
@@ -470,6 +482,8 @@ export function render(root, catalog, env) {
     if (action.type === "select") {
       if (ev.repeat) return;
       if (reordering) { exitReorder(); swallowSelectUp = true; return; }
+      if (view.kind === "list") { swallowSelectUp = true; selectCurrent(); return; } // pas d'appui long dans les menus
+      swallowSelectUp = false;
       longFired = false;
       clearTimeout(pressTimer);
       pressTimer = setTimeout(() => { longFired = enterReorder(); }, LONG_PRESS_MS);
@@ -482,6 +496,7 @@ export function render(root, catalog, env) {
       return;
     }
     if (action.type === "move") {
+      if (action.dir === "left" && !onHome() && (view.kind === "list" || grid.position.col === 0)) { goBack(); return; }
       if (view.kind === "grid") { grid.move(action.dir); top().pos = grid.position; paintGrid(); }
       else {
         const e = top();

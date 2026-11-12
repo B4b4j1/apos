@@ -7,7 +7,7 @@ const SELECT_NAMES = { Enter: true };
 const SELECT_CODES = { 13: true };
 // 461 : touche Retour LG (webOS). Escape et Backspace pour le clavier de test.
 const BACK_NAMES = { Escape: true, Backspace: true };
-const BACK_CODES = { 461: true, 27: true, 8: true };
+const BACK_CODES = { 461: true, 10009: true, 27: true, 8: true };
 // 403 : bouton rouge de la télécommande LG : mode réorganisation des tuiles.
 const REORDER_CODES = { 403: true };
 
