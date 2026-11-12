@@ -1,0 +1,11 @@
+{
+  "id": "com.apos.launcher",
+  "version": "0.1.0",
+  "vendor": "ApOS",
+  "type": "web",
+  "main": "index.html",
+  "title": "ApOS",
+  "icon": "icon.png",
+  "requiredPermissions": [],
+  "resolution": "1920x1080"
+}
