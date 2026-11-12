@@ -22,7 +22,8 @@ export const GROUPS = [
         [c("normal", "Normale"), c("strong", "Forte"), c("border", "Contour")], "normal"),
       choice("textSize", "Taille du texte", "Taille des noms et de l'horloge.",
         [c("normal", "Normal"), c("large", "Grand")], "normal"),
-      toggle("avatar", "Compagnon", "Petit personnage sur l'accueil qui réagit à vos actions (il dort la nuit et s'inquiète près de la limite de temps).", true),
+      choice("companion", "Compagnon", "Petit personnage sur l'accueil qui réagit à vos actions : il dort la nuit et s'inquiète près de la limite de temps. Ses yeux suivent le pointeur.",
+        [c("none", "Aucun"), c("cat", "Chat"), c("unicorn", "Licorne"), c("rabbit", "Lapin")], "cat"),
       toggle("reduceMotion", "Réduire les animations", "Le focus et les écrans changent d'un coup, sans glisser ni zoomer.", false),
       toggle("dockGlass", "Dock en verre", "Panneau translucide derrière la rangée d'apps.", true),
       toggle("dockBlur", "Flou du dock", "Floute le fond derrière le dock (peut ralentir la TV).", false),
@@ -66,6 +67,7 @@ export function defaults() {
 export function sanitize(raw) {
   const out = defaults();
   if (raw === null || typeof raw !== "object" || Array.isArray(raw)) return out;
+  if (raw.avatar === false && raw.companion === undefined) out.companion = "none"; // ancien réglage « Compagnon » désactivé
   GROUPS.forEach((g) => g.items.forEach((item) => {
     const v = raw[item.key];
     if (item.type === "toggle" && typeof v === "boolean") out[item.key] = v;

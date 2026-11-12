@@ -12,3 +12,6 @@ app/assets/icons/
 .DS_Store
 app/config/launchpoints.json
 app/data/
+
+# Planches sources des compagnons (PNG ~1 Mo) : seules les versions WebP réduites sont versionnées
+companions-src/

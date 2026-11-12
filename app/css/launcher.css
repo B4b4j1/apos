@@ -151,50 +151,40 @@ svg { display: block; width: 100%; height: 100%; }
 .pinkey--focused { background: #fff; color: #10151f; transform: scale(1.08); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4); }
 
 /* ---------- compagnon (avatar) ---------- */
-.avatar { position: fixed; z-index: 3; right: calc(var(--edge) + 6px); top: 200px; width: 132px; height: 132px; pointer-events: none; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.45)); }
-.no-avatar .avatar, .in-settings .avatar { display: none; }
-.avatar svg { overflow: visible; }
-.avatar__skin { fill: #8fd0ff; stroke: rgba(255, 255, 255, 0.55); stroke-width: 2; }
-.avatar__shadow { fill: rgba(0, 0, 0, 0.3); }
-.avatar__cheek { fill: #ff9fb8; opacity: 0; }
-.avatar__sclera { fill: #fff; }
-.avatar__pupil { fill: #1b2a41; }
-.avatar__eye { transform-box: fill-box; transform-origin: center; animation: avatar-blink 5s infinite; }
-.avatar__mouth { fill: none; stroke: #1b2a41; stroke-width: 4; stroke-linecap: round; opacity: 0; }
-.avatar__mouth--open { fill: #1b2a41; stroke: none; }
-.avatar__prop { opacity: 0; fill: #fff; font: 700 26px sans-serif; transform-box: fill-box; transform-origin: center; }
-.avatar__prop--star { fill: #ffd166; }
-.avatar__prop--drop { fill: #7ee0ff; }
-.avatar__body { transform-box: fill-box; transform-origin: 50% 100%; animation: avatar-bob 3.2s ease-in-out infinite; }
-
-.avatar--idle .avatar__mouth--smile,
-.avatar--happy .avatar__mouth--smile,
-.avatar--proud .avatar__mouth--smile,
-.avatar--curious .avatar__mouth--flat,
-.avatar--sleepy .avatar__mouth--flat,
-.avatar--surprised .avatar__mouth--open,
-.avatar--worried .avatar__mouth--frown { opacity: 1; }
-.avatar--happy .avatar__cheek, .avatar--proud .avatar__cheek { opacity: 0.9; }
+.avatar { position: fixed; z-index: 3; right: calc(var(--edge) + 6px); top: 190px; width: 150px; height: 150px; pointer-events: none; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4)); }
+.in-settings .avatar { display: none; }
+.avatar__body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: avatar-bob 3.2s ease-in-out infinite; }
+.avatar__layer { position: absolute; inset: 0; opacity: 0; transition: opacity 0.22s ease; }
+.avatar__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; user-select: none; }
+.avatar__pupil { position: absolute; transform: translate(-50%, -50%); user-select: none; }
+.avatar--idle .avatar__layer--idle,
+.avatar--happy .avatar__layer--happy,
+.avatar--curious .avatar__layer--curious,
+.avatar--worried .avatar__layer--worried,
+.avatar--proud .avatar__layer--proud,
+.avatar--sleepy .avatar__layer--sleepy,
+.avatar--surprised .avatar__layer--surprised { opacity: 1; }
+.avatar__prop { position: absolute; opacity: 0; color: #fff; font: 700 26px sans-serif; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
+.avatar__prop--zzz { right: 0; top: 4px; }
+.avatar__prop--ask, .avatar__prop--bang, .avatar__prop--star { right: 2px; top: 2px; }
+.avatar__prop--star { color: #ffd166; }
+.avatar__prop--drop { right: 8px; top: 24px; width: 12px; height: 18px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: #7ee0ff; text-shadow: none; }
 .avatar--happy .avatar__body { animation: avatar-hop 0.55s ease-in-out infinite; }
 .avatar--proud .avatar__body { animation: avatar-bob 1.6s ease-in-out infinite; }
 .avatar--proud .avatar__prop--star { opacity: 1; animation: avatar-pop 0.9s ease-in-out infinite; }
 .avatar--curious .avatar__body { animation: avatar-tilt 2.4s ease-in-out infinite; }
 .avatar--curious .avatar__prop--ask { opacity: 1; }
-.avatar--surprised .avatar__body { animation: avatar-shake 0.35s ease-in-out infinite; }
-.avatar--surprised .avatar__eye { animation: none; transform: scale(1.3); }
+.avatar--surprised .avatar__body { animation: avatar-hop 0.8s ease-in-out infinite; }
 .avatar--surprised .avatar__prop--bang { opacity: 1; }
-.avatar--sleepy .avatar__eye { animation: none; transform: scaleY(0.12); }
 .avatar--sleepy .avatar__body { animation: avatar-bob 5.5s ease-in-out infinite; }
 .avatar--sleepy .avatar__prop--zzz { opacity: 1; animation: avatar-float 2.4s ease-in-out infinite; }
-.avatar--worried .avatar__skin { fill: #b9c8e6; }
 .avatar--worried .avatar__prop--drop { opacity: 1; animation: avatar-float 1.6s ease-in infinite; }
 .avatar--worried .avatar__body { animation: avatar-shake 0.7s ease-in-out infinite; }
 
 @keyframes avatar-bob { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-@keyframes avatar-hop { 0%, 100% { transform: translateY(0) scale(1.04, 0.96); } 50% { transform: translateY(-16px) scale(0.97, 1.04); } }
-@keyframes avatar-tilt { 0%, 100% { transform: rotate(-6deg); } 50% { transform: rotate(6deg); } }
+@keyframes avatar-hop { 0%, 100% { transform: translateY(0) scale(1.03, 0.97); } 50% { transform: translateY(-14px) scale(0.98, 1.03); } }
+@keyframes avatar-tilt { 0%, 100% { transform: rotate(-5deg); } 50% { transform: rotate(5deg); } }
 @keyframes avatar-shake { 0%, 100% { transform: translateX(-2px); } 50% { transform: translateX(2px); } }
 @keyframes avatar-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
 @keyframes avatar-float { 0% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
-@keyframes avatar-blink { 0%, 94%, 100% { transform: scaleY(1); } 97% { transform: scaleY(0.1); } }
-.reduce-motion .avatar__body, .reduce-motion .avatar__eye, .reduce-motion .avatar__prop { animation: none !important; }
+.reduce-motion .avatar__body, .reduce-motion .avatar__prop { animation: none !important; }

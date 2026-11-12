@@ -19,6 +19,7 @@ import { loadDay, loadDays, loadRange, loadInterval, totalSeconds, sortedUsage, 
 import { createApi, API_BASE } from "./api.js";
 import { chartBars, shortDuration } from "./chart.js";
 import { createMoodEngine, limitRatio, buildAvatar, setAvatarMood, attachGaze } from "./avatar.js";
+import { COMPANIONS } from "./companion-data.js";
 import { updateSummary, installErrorMessage } from "./update.js";
 import { DAILY_CHOICES, APP_CHOICES, EXTENSION_CHOICES, ACTION_CHOICES, limitLabel, lockMessage, pinPress } from "./limits.js";
 
@@ -102,12 +103,25 @@ export function render(root, catalog, env) {
   // ---------- compagnon (avatar) ----------
 
   const moodEngine = createMoodEngine();
-  const avatarBox = buildAvatar();
+  let avatarBox = null;
+  let avatarId = "";
   let avatarMood = "";
-  document.body.appendChild(avatarBox);
-  attachGaze(avatarBox, document);
+  let detachGaze = null;
+  // Crée (ou remplace) le compagnon choisi dans les réglages ; « aucun » le retire.
+  function setCompanion(id) {
+    if (id === avatarId) return;
+    avatarId = id;
+    if (detachGaze) { detachGaze(); detachGaze = null; }
+    if (avatarBox) { avatarBox.remove(); avatarBox = null; }
+    avatarMood = "";
+    if (!COMPANIONS[id]) return;
+    avatarBox = buildAvatar(COMPANIONS[id]);
+    document.body.appendChild(avatarBox);
+    detachGaze = attachGaze(avatarBox, document);
+    updateAvatar();
+  }
   function updateAvatar() {
-    if (document.hidden) return;
+    if (document.hidden || !avatarBox) return;
     const mood = moodEngine.mood(Date.now(), { hour: new Date().getHours(), limitRatio: limitRatio(limitState), locked: !!(limitState && limitState.locked) });
     if (mood !== avatarMood) { avatarMood = mood; setAvatarMood(avatarBox, mood); }
   }
@@ -134,7 +148,7 @@ export function render(root, catalog, env) {
     style.setProperty("--fs", settings.textSize === "large" ? "1.25" : "1");
     const cl = document.body.classList;
     cl.toggle("reduce-motion", settings.reduceMotion);
-    cl.toggle("no-avatar", !settings.avatar);
+    setCompanion(settings.companion);
     cl.toggle("no-dock-glass", !settings.dockGlass);
     cl.toggle("dock-blur", settings.dockBlur);
     cl.toggle("settings-blur", settings.settingsBlur);

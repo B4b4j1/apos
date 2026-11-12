@@ -1,5 +1,5 @@
 // Petit compagnon de l'écran d'accueil : choisit une humeur d'après les actions faites dans ApOS.
-// Logique pure (testée) ; le dessin SVG est construit par buildAvatar().
+// Logique pure (testée) ; le personnage est assemblé par buildAvatar() à partir des images de companion-data.js.
 export const MOODS = ["idle", "happy", "curious", "sleepy", "worried", "proud", "surprised"];
 
 // Humeur temporaire déclenchée par un événement : { humeur, durée en ms }.
@@ -44,56 +44,75 @@ export function limitRatio(state) {
   return Math.min(2, state.total / state.config.daily_limit);
 }
 
-const NS = "http://www.w3.org/2000/svg";
-const EYE_RX = 8;
-const EYE_RY = 10;
-const PUPIL_R = 4.5;
-const GAZE_REACH_PX = 260; // distance au pointeur à partir de laquelle les pupilles sont au bord de l'œil
+const GAZE_REACH_PX = 260; // distance au pointeur à partir de laquelle la pupille est au bord de l'œil
 const GAZE_IDLE_MS = 6000; // pointeur immobile ou masqué : les yeux reviennent au centre
+const PUPIL_RATIO = 0.62; // diamètre de la pupille par rapport au plus petit côté de l'œil
+const TRAVEL = 0.85; // part de la marge dans l'œil que la pupille peut parcourir
 
-// Décalage de la pupille (unités du dessin) pour regarder dans la direction (dx, dy) en pixels.
-// Reste à l'intérieur de l'œil (ellipse) ; proportionnel à la distance jusqu'à GAZE_REACH_PX.
+// Décalage de la pupille, dans le disque unité, pour regarder dans la direction (dx, dy) en pixels.
+// Proportionnel à la distance jusqu'à GAZE_REACH_PX, jamais au-delà du bord de l'œil.
 export function gaze(dx, dy) {
   const dist = Math.sqrt(dx * dx + dy * dy);
   if (!(dist > 0)) return { x: 0, y: 0 };
   const strength = Math.min(1, dist / GAZE_REACH_PX);
-  return { x: (dx / dist) * strength * (EYE_RX - PUPIL_R), y: (dy / dist) * strength * (EYE_RY - PUPIL_R) };
+  return { x: (dx / dist) * strength, y: (dy / dist) * strength };
 }
 
-function node(name, attrs, cls) {
-  const n = document.createElementNS(NS, name);
-  Object.keys(attrs || {}).forEach((k) => n.setAttribute(k, attrs[k]));
-  if (cls) n.setAttribute("class", cls);
+// Géométrie d'une pupille posée dans un œil (fractions de l'image) : centre, diamètre et déplacement maximal.
+export function pupilGeometry(eye) {
+  const d = Math.min(eye.w, eye.h) * PUPIL_RATIO;
+  return {
+    x: eye.x, y: eye.y, d,
+    tx: Math.max(0, (eye.w - d) / 2) * TRAVEL,
+    ty: Math.max(0, (eye.h - d) / 2) * TRAVEL,
+  };
+}
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text) n.textContent = text;
   return n;
 }
 
-export function buildAvatar() {
-  const box = document.createElement("div");
-  box.className = "avatar avatar--idle";
-  const svg = node("svg", { viewBox: "0 0 120 120", width: "100%", height: "100%" });
-  const body = node("g", {}, "avatar__body");
-  body.appendChild(node("ellipse", { cx: 60, cy: 112, rx: 30, ry: 5 }, "avatar__shadow"));
-  body.appendChild(node("circle", { cx: 60, cy: 64, r: 42 }, "avatar__skin"));
-  body.appendChild(node("circle", { cx: 38, cy: 78, r: 6 }, "avatar__cheek"));
-  body.appendChild(node("circle", { cx: 82, cy: 78, r: 6 }, "avatar__cheek"));
-  [["l", 46], ["r", 74]].forEach((e) => {
-    const eye = node("g", {}, "avatar__eye avatar__eye--" + e[0]);
-    eye.appendChild(node("ellipse", { cx: e[1], cy: 58, rx: EYE_RX, ry: EYE_RY }, "avatar__sclera"));
-    eye.appendChild(node("circle", { cx: e[1], cy: 58, r: PUPIL_R }, "avatar__pupil"));
-    body.appendChild(eye);
+// Assemble un compagnon : une couche par humeur (images empilées, fondu enchaîné), pupilles mobiles sur les têtes
+// aux yeux vides, petits accessoires (zzz, ?, !, étoile, goutte). `companion` vient de companion-data.js.
+export function buildAvatar(companion) {
+  const box = el("div", "avatar avatar--idle");
+  const body = el("div", "avatar__body");
+  MOODS.forEach((mood) => {
+    const m = companion.moods[mood];
+    if (!m) return;
+    const layer = el("div", "avatar__layer avatar__layer--" + mood);
+    const img = el("img", "avatar__img");
+    img.src = m.img;
+    img.alt = "";
+    img.draggable = false;
+    layer.appendChild(img);
+    (m.eyes || []).forEach((eye) => {
+      const g = pupilGeometry(eye);
+      const p = el("img", "avatar__pupil");
+      p.src = companion.pupil;
+      p.alt = "";
+      p.draggable = false;
+      p.style.width = (g.d * 100).toFixed(2) + "%";
+      p.style.height = (g.d * 100).toFixed(2) + "%";
+      p.dataset.x = g.x;
+      p.dataset.y = g.y;
+      p.dataset.tx = g.tx;
+      p.dataset.ty = g.ty;
+      p.style.left = (g.x * 100).toFixed(2) + "%";
+      p.style.top = (g.y * 100).toFixed(2) + "%";
+      layer.appendChild(p);
+    });
+    body.appendChild(layer);
   });
-  body.appendChild(node("path", { d: "M48 78 Q60 90 72 78" }, "avatar__mouth avatar__mouth--smile"));
-  body.appendChild(node("path", { d: "M50 82 L70 82" }, "avatar__mouth avatar__mouth--flat"));
-  body.appendChild(node("ellipse", { cx: 60, cy: 82, rx: 7, ry: 8 }, "avatar__mouth avatar__mouth--open"));
-  body.appendChild(node("path", { d: "M48 86 Q60 74 72 86" }, "avatar__mouth avatar__mouth--frown"));
-  svg.appendChild(body);
-  const prop = (text, x, y, cls) => { const t = node("text", { x, y }, "avatar__prop " + cls); t.textContent = text; return t; };
-  svg.appendChild(prop("z", 96, 28, "avatar__prop--zzz"));
-  svg.appendChild(prop("?", 92, 30, "avatar__prop--ask"));
-  svg.appendChild(prop("!", 92, 30, "avatar__prop--bang"));
-  svg.appendChild(prop("★", 92, 30, "avatar__prop--star"));
-  svg.appendChild(node("path", { d: "M96 40 Q100 48 96 52 Q92 48 96 40" }, "avatar__prop avatar__prop--drop"));
-  box.appendChild(svg);
+  box.appendChild(body);
+  box.appendChild(el("span", "avatar__prop avatar__prop--zzz", "z"));
+  box.appendChild(el("span", "avatar__prop avatar__prop--ask", "?"));
+  box.appendChild(el("span", "avatar__prop avatar__prop--bang", "!"));
+  box.appendChild(el("span", "avatar__prop avatar__prop--star", "\u2605"));
+  box.appendChild(el("span", "avatar__prop avatar__prop--drop"));
   return box;
 }
 
@@ -103,28 +122,32 @@ export function setAvatarMood(box, mood) {
 }
 
 // Les yeux suivent le pointeur (souris, Magic Remote) : seules les pupilles bougent, pas l'avatar.
+// Renvoie une fonction qui détache l'écoute (changement de compagnon).
 export function attachGaze(box, target) {
   const pupils = [].slice.call(box.querySelectorAll(".avatar__pupil"));
-  const eyes = [].slice.call(box.querySelectorAll(".avatar__eye"));
   let pending = null;
   let idleTimer = null;
-  function look(x, y) {
-    pupils.forEach((p) => p.setAttribute("transform", "translate(" + x.toFixed(2) + " " + y.toFixed(2) + ")"));
+  function look(ox, oy) {
+    pupils.forEach((p) => {
+      p.style.left = ((+p.dataset.x + ox * +p.dataset.tx) * 100).toFixed(2) + "%";
+      p.style.top = ((+p.dataset.y + oy * +p.dataset.ty) * 100).toFixed(2) + "%";
+    });
   }
   function apply() {
     const pt = pending;
     pending = null;
     if (!pt || box.offsetWidth === 0) return;
     const r = box.getBoundingClientRect();
-    const g = gaze(pt.x - (r.left + r.width / 2), pt.y - (r.top + r.height * 0.48));
+    const g = gaze(pt.x - (r.left + r.width / 2), pt.y - (r.top + r.height * 0.5));
     look(g.x, g.y);
   }
-  target.addEventListener("mousemove", (ev) => {
+  function onMove(ev) {
     const first = pending === null;
     pending = { x: ev.clientX, y: ev.clientY };
     if (first) requestAnimationFrame(apply);
     clearTimeout(idleTimer);
     idleTimer = setTimeout(() => look(0, 0), GAZE_IDLE_MS);
-  });
-  return eyes.length;
+  }
+  target.addEventListener("mousemove", onMove);
+  return () => { clearTimeout(idleTimer); target.removeEventListener("mousemove", onMove); };
 }

@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { createMoodEngine, limitRatio, isNight, gaze, SLEEP_AFTER_MS, MOODS } from "../js/avatar.js";
+import { existsSync } from "fs";
+import { resolve } from "path";
+import { createMoodEngine, limitRatio, isNight, gaze, pupilGeometry, SLEEP_AFTER_MS, MOODS } from "../js/avatar.js";
+import { COMPANIONS, COMPANION_ORDER } from "../js/companion-data.js";
+import { GROUPS, sanitize } from "../js/settings.js";
 
 const DAY = { hour: 14, limitRatio: 0, locked: false };
 
@@ -81,10 +85,56 @@ describe("gaze", () => {
     expect(gaze(0, -2000).y).toBeLessThan(0);
     expect(gaze(0, 2000).y).toBeGreaterThan(0);
   });
-  it("never leaves the eye whatever the distance or angle", () => {
+  it("never leaves the unit disk whatever the distance or angle", () => {
     for (let a = 0; a < 360; a += 15) {
       const g = gaze(Math.cos(a * Math.PI / 180) * 5000, Math.sin(a * Math.PI / 180) * 5000);
-      expect((g.x / 3.5) ** 2 + (g.y / 5.5) ** 2).toBeLessThanOrEqual(1.0001);
+      expect(g.x * g.x + g.y * g.y).toBeLessThanOrEqual(1.0001);
     }
+  });
+});
+
+describe("pupil geometry", () => {
+  it("keeps the pupil fully inside the eye at the extreme of its travel", () => {
+    const eye = { x: 0.33, y: 0.54, w: 0.15, h: 0.19 };
+    const g = pupilGeometry(eye);
+    expect(g.d).toBeLessThan(Math.min(eye.w, eye.h));
+    expect(g.tx + g.d / 2).toBeLessThan(eye.w / 2);
+    expect(g.ty + g.d / 2).toBeLessThan(eye.h / 2);
+  });
+  it("never has a negative travel for a very small eye", () => {
+    const g = pupilGeometry({ x: 0.5, y: 0.5, w: 0.01, h: 0.01 });
+    expect(g.tx).toBeGreaterThanOrEqual(0);
+    expect(g.ty).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("companion data", () => {
+  const root = resolve(__dirname, "..");
+  it("offers the three companions chosen in the settings, plus none", () => {
+    const item = GROUPS.reduce((acc, g) => acc.concat(g.items), []).filter((i) => i.key === "companion")[0];
+    expect(item.choices.map((c) => c.value)).toEqual(["none"].concat(COMPANION_ORDER));
+    expect(sanitize({ companion: "unicorn" }).companion).toBe("unicorn");
+    expect(sanitize({ companion: "dragon" }).companion).toBe(item.default);
+    expect(sanitize({ avatar: false }).companion).toBe("none");
+    expect(sanitize({ avatar: false, companion: "rabbit" }).companion).toBe("rabbit");
+  });
+  COMPANION_ORDER.forEach((id) => {
+    it(id + " has an image for every mood, a pupil, and two eyes on the open-eyed heads", () => {
+      const c = COMPANIONS[id];
+      expect(existsSync(resolve(root, c.pupil))).toBe(true);
+      MOODS.forEach((mood) => {
+        expect(existsSync(resolve(root, c.moods[mood].img))).toBe(true);
+      });
+      ["idle", "curious", "worried"].forEach((mood) => {
+        const eyes = c.moods[mood].eyes;
+        expect(eyes.length).toBe(2);
+        expect(eyes[0].x).toBeLessThan(eyes[1].x);
+        eyes.forEach((e) => {
+          [e.x, e.y].forEach((v) => { expect(v).toBeGreaterThan(0); expect(v).toBeLessThan(1); });
+          expect(e.w).toBeGreaterThan(0.05);
+          expect(e.h).toBeGreaterThan(0.05);
+        });
+      });
+    });
   });
 });
