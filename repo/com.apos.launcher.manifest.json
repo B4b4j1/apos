@@ -1,14 +1,14 @@
 {
   "id": "com.apos.launcher",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "type": "web",
   "title": "ApOS",
   "appDescription": "Lanceur local ApOS : apps, fonds d'écran, temps d'écran, sans publicité ni télémétrie",
   "iconUri": "https://raw.githubusercontent.com/B4b4j1/apos/main/app/icon.png",
   "sourceUrl": "https://github.com/B4b4j1/apos",
   "rootRequired": false,
-  "ipkUrl": "https://github.com/B4b4j1/apos/releases/download/v0.6.0/com.apos.launcher_0.6.0_all.ipk",
+  "ipkUrl": "https://github.com/B4b4j1/apos/releases/download/v0.7.0/com.apos.launcher_0.7.0_all.ipk",
   "ipkHash": {
-    "sha256": "4c7ba0208094fb859adea1c1ccaf3d074834a0bd6452a82004fd740728727bc0"
+    "sha256": "c8e532203c37d9809dcfc3b046b9c4a2ce643fae780176da41b9c2b876152334"
   }
 }
