@@ -207,4 +207,4 @@ svg { display: block; width: 100%; height: 100%; }
 .reduce-motion .avatar__body, .reduce-motion .avatar__prop { animation: none !important; }
 
 /* ---------- avatars sélectionnables à la télécommande ---------- */
-.avatar--focused { transform: scale(1.12); border-radius: 28px; background: rgba(255, 255, 255, 0.2); box-shadow: 0 0 0 4px #fff, 0 18px 34px rgba(0, 0, 0, 0.4); }
+.avatar--focused { transform: scale(1.12); filter: drop-shadow(0 0 12px rgba(255, 255, 255, 0.85)) drop-shadow(0 0 30px rgba(255, 255, 255, 0.5)) drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
