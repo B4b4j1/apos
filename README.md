@@ -34,6 +34,9 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 - Réinstaller ApOS depuis un paquet efface le dossier `data/` (l'historique) ; `scripts/device/deploy-app.sh <ip-tv>` le conserve.
 - Fuseau horaire : `scripts/device/set-timezone.sh <ip-tv> [zone]` (Europe/Paris par défaut ; retour : `Etc/GMT-0`). Le jour du rapport change à minuit selon ce fuseau.
 
+## Compagnon (avatar)
+Petit personnage en SVG en haut à droite de l'accueil (`app/js/avatar.js`, réglage Apparence > Compagnon). Il réagit au lancement d'une app (content), à l'entrée dans les réglages (curieux), à la réorganisation (surpris), à un réglage enregistré ou une mise à jour (fier). Il dort la nuit (22 h à 7 h) ou après 3 minutes sans action, et s'inquiète à partir de 80 % de la limite quotidienne ou à l'écran de blocage. Tout est local, sans image externe.
+
 ## Liste des apps (launcher)
 - Une app web ne peut pas lister les apps via Luna. `bash scripts/device/refresh-apps.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin) génère sur la TV `config/launchpoints.json`, copie les icônes et calcule la couleur de tuile de chaque app (sur le Mac, avec Pillow). À relancer après l'ajout ou la suppression d'une app, ou après une réinstallation d'ApOS.
 

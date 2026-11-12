@@ -18,6 +18,7 @@ import { iconSvg } from "./icons.js";
 import { loadDay, loadDays, loadRange, loadInterval, totalSeconds, sortedUsage, formatDuration, appTitle } from "./screentime.js";
 import { createApi, API_BASE } from "./api.js";
 import { chartBars, shortDuration } from "./chart.js";
+import { createMoodEngine, limitRatio, buildAvatar, setAvatarMood } from "./avatar.js";
 import { updateSummary, installErrorMessage } from "./update.js";
 import { DAILY_CHOICES, APP_CHOICES, EXTENSION_CHOICES, ACTION_CHOICES, limitLabel, lockMessage, pinPress } from "./limits.js";
 
@@ -98,6 +99,20 @@ export function render(root, catalog, env) {
     fetch("appinfo.json").then((r) => r.json()).then((j) => { appVersion = String(j.version || ""); }).catch(() => {});
   }
 
+  // ---------- compagnon (avatar) ----------
+
+  const moodEngine = createMoodEngine();
+  const avatarBox = buildAvatar();
+  let avatarMood = "";
+  document.body.appendChild(avatarBox);
+  function updateAvatar() {
+    if (document.hidden) return;
+    const mood = moodEngine.mood(Date.now(), { hour: new Date().getHours(), limitRatio: limitRatio(limitState), locked: !!(limitState && limitState.locked) });
+    if (mood !== avatarMood) { avatarMood = mood; setAvatarMood(avatarBox, mood); }
+  }
+  function avatarEvent(name) { moodEngine.event(name, Date.now()); updateAvatar(); }
+  moodEngine.event("touch", Date.now());
+
   const top = () => stack[stack.length - 1];
   const onHome = () => stack.length === 1;
 
@@ -118,6 +133,7 @@ export function render(root, catalog, env) {
     style.setProperty("--fs", settings.textSize === "large" ? "1.25" : "1");
     const cl = document.body.classList;
     cl.toggle("reduce-motion", settings.reduceMotion);
+    cl.toggle("no-avatar", !settings.avatar);
     cl.toggle("no-dock-glass", !settings.dockGlass);
     cl.toggle("dock-blur", settings.dockBlur);
     cl.toggle("settings-blur", settings.settingsBlur);
@@ -425,7 +441,7 @@ export function render(root, catalog, env) {
   }
 
   function launchEntry(id) {
-    return () => launch(id).catch((err) => say("Lancement impossible : " + err.message));
+    return () => { avatarEvent("launch"); return launch(id).catch((err) => say("Lancement impossible : " + err.message)); };
   }
 
   function appEntries() {
@@ -440,7 +456,7 @@ export function render(root, catalog, env) {
 
   // ---------- écrans ----------
 
-  function push(build) { stack.push({ build }); reordering = false; show(); }
+  function push(build) { avatarEvent(build === settingsRootView ? "settings" : "touch"); stack.push({ build }); reordering = false; show(); }
 
   function homeView() {
     const topButtons = [
@@ -459,6 +475,7 @@ export function render(root, catalog, env) {
   function setSetting(key, value) {
     settings[key] = value;
     saveSettings(storage, settings);
+    avatarEvent("saved");
     applyAppearance();
     if (key.indexOf("clock") === 0) scheduleClock();
     if (key === "slideInterval") applyMode();
@@ -550,6 +567,7 @@ export function render(root, catalog, env) {
             updateBusy = "Installation en cours…"; show();
             api.post("/update/install", {}).then((res) => {
               updateBusy = res.status === 200 ? "Installée : relancez ApOS" : "";
+              if (res.status === 200) avatarEvent("updated");
               if (res.status !== 200) say(installErrorMessage(res.status));
               show();
             });
@@ -774,6 +792,7 @@ export function render(root, catalog, env) {
   function enterReorder() {
     if (!onHome() || grid.position.row !== 1 || view.rows[1].entries.length < 2) return false;
     reordering = true;
+    avatarEvent("reorder");
     say("Réorganisation : ◀ ▶ pour déplacer, OK pour valider");
     paintGrid();
     return true;
@@ -830,6 +849,8 @@ export function render(root, catalog, env) {
   scheduleClock();
   setInterval(() => { if (onHome()) refreshScreenTime(); }, 15000);
   setInterval(refreshLimits, 10000);
+  setInterval(updateAvatar, 1000);
+  updateAvatar();
   document.addEventListener("webOSRelaunch", refreshLimits);
   document.addEventListener("visibilitychange", () => { if (!document.hidden) refreshLimits(); });
   refreshLimits();
@@ -838,6 +859,7 @@ export function render(root, catalog, env) {
   document.addEventListener("keydown", (ev) => {
     const action = keyAction(ev);
     if (!action) return;
+    avatarEvent("touch");
     if (action.type === "digit") { if (view.kind === "pin") pressPinKey(action.digit); return; }
     if (action.type === "select") {
       if (ev.repeat) return;

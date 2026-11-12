@@ -22,6 +22,7 @@ export const GROUPS = [
         [c("normal", "Normale"), c("strong", "Forte"), c("border", "Contour")], "normal"),
       choice("textSize", "Taille du texte", "Taille des noms et de l'horloge.",
         [c("normal", "Normal"), c("large", "Grand")], "normal"),
+      toggle("avatar", "Compagnon", "Petit personnage sur l'accueil qui réagit à vos actions (il dort la nuit et s'inquiète près de la limite de temps).", true),
       toggle("reduceMotion", "Réduire les animations", "Le focus et les écrans changent d'un coup, sans glisser ni zoomer.", false),
       toggle("dockGlass", "Dock en verre", "Panneau translucide derrière la rangée d'apps.", true),
       toggle("dockBlur", "Flou du dock", "Floute le fond derrière le dock (peut ralentir la TV).", false),
