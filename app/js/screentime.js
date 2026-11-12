@@ -54,7 +54,7 @@ export function sortedUsage(usage) {
 
 export function formatDuration(seconds) {
   if (seconds <= 0) return "0 min";
-  if (seconds < 60) return "< 1 min";
+  if (seconds < 60) return "moins d'1 min";
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return minutes + " min";
   const rest = minutes % 60;

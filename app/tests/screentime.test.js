@@ -32,7 +32,7 @@ describe("aggregation", () => {
 describe("formatDuration", () => {
   it("formats seconds, minutes and hours", () => {
     expect(formatDuration(0)).toBe("0 min");
-    expect(formatDuration(45)).toBe("< 1 min");
+    expect(formatDuration(45)).toBe("moins d'1 min");
     expect(formatDuration(60)).toBe("1 min");
     expect(formatDuration(59 * 60)).toBe("59 min");
     expect(formatDuration(3600)).toBe("1 h 00 min");
