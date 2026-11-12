@@ -1,6 +1,7 @@
 # Découverte de l'appareil
 
 - Modèle : LG 43UR74006LB (fourni par l'utilisateur, à confirmer par `collect-info.sh`)
+- Version logicielle (Réglages, relevée par l'utilisateur) : 33.31.75 ; à comparer à la version rootable 13.40.90 de CanI.RootMy.TV. Vérification impossible depuis cet environnement : canirootmytv.com et canirootmy.tv ne se résolvent pas (ERR_NAME_NOT_RESOLVED), rootmy.tv ne propose que RootMyTV v1/v2, déclaré obsolète. Un accès root SSH existe déjà sur cette TV, donc le root est présent sur ce firmware ; le risque porte sur la persistance après une mise à jour LG.
 - webOS : « webOS25 / 10.3.2-33 » (relevé sur l'écran Informations de la TV, 2026-11-12) ; stockage interne 0,71 / 1,44 Go disponibles. Les identifiants matériels (MAC, ESN, Widevine) ne sont pas consignés dans le dépôt.
 - Méthode de root : « slopbro », via repo.webosbrew.org (fourni par l'utilisateur ; ce nom n'apparaît pas dans le guide webosbrew.org/rooting, à vérifier sur https://canirootmytv.com ou rootmy.tv avant toute manipulation)
 - Version de l'outil root : à relever
