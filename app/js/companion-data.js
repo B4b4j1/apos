@@ -138,6 +138,10 @@ export const COMPANIONS = {
       "surprised": {
         "img": "assets/companions/unicorn/surprised.webp"
       }
+    },
+    "horn": {
+      "x": 0.5,
+      "y": 0.0566
     }
   },
   "rabbit": {
@@ -148,16 +152,16 @@ export const COMPANIONS = {
         "img": "assets/companions/rabbit/idle.webp",
         "eyes": [
           {
-            "x": 0.34,
-            "y": 0.6798,
-            "w": 0.1426,
-            "h": 0.1543
+            "x": 0.3449,
+            "y": 0.6724,
+            "w": 0.1387,
+            "h": 0.1484
           },
           {
-            "x": 0.656,
-            "y": 0.6801,
-            "w": 0.1426,
-            "h": 0.1543
+            "x": 0.6511,
+            "y": 0.6728,
+            "w": 0.1387,
+            "h": 0.1484
           }
         ]
       },
@@ -168,16 +172,16 @@ export const COMPANIONS = {
         "img": "assets/companions/rabbit/curious.webp",
         "eyes": [
           {
-            "x": 0.3416,
-            "y": 0.6856,
-            "w": 0.1543,
-            "h": 0.1621
+            "x": 0.3466,
+            "y": 0.6781,
+            "w": 0.1484,
+            "h": 0.1543
           },
           {
-            "x": 0.6325,
-            "y": 0.6856,
-            "w": 0.1543,
-            "h": 0.1621
+            "x": 0.6283,
+            "y": 0.6779,
+            "w": 0.1484,
+            "h": 0.1543
           }
         ]
       },
@@ -185,16 +189,16 @@ export const COMPANIONS = {
         "img": "assets/companions/rabbit/worried.webp",
         "eyes": [
           {
-            "x": 0.3614,
-            "y": 0.5613,
-            "w": 0.1348,
-            "h": 0.1367
+            "x": 0.3658,
+            "y": 0.5575,
+            "w": 0.1309,
+            "h": 0.1328
           },
           {
-            "x": 0.6349,
-            "y": 0.5614,
-            "w": 0.1348,
-            "h": 0.1367
+            "x": 0.6308,
+            "y": 0.5576,
+            "w": 0.1309,
+            "h": 0.1328
           }
         ]
       },
@@ -206,6 +210,21 @@ export const COMPANIONS = {
       },
       "surprised": {
         "img": "assets/companions/rabbit/surprised.webp"
+      },
+      "eat1": {
+        "img": "assets/companions/rabbit/eat1.webp"
+      },
+      "eat2": {
+        "img": "assets/companions/rabbit/eat2.webp"
+      },
+      "eat3": {
+        "img": "assets/companions/rabbit/eat3.webp"
+      }
+    },
+    "sprites": {
+      "carrot": {
+        "img": "assets/companions/rabbit/carrot.webp",
+        "ratio": 0.506
       }
     }
   }

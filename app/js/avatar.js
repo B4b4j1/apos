@@ -75,15 +75,43 @@ function el(tag, cls, text) {
   return n;
 }
 
-// Assemble un compagnon : une couche par humeur (images empilées, fondu enchaîné), pupilles mobiles sur les têtes
-// aux yeux vides, petits accessoires (zzz, ?, !, étoile, goutte). `companion` vient de companion-data.js.
-export function buildAvatar(companion) {
+// Animations déclenchées par un clic : suite d'étapes { layer (image affichée), ms, fx (classe d'effet CSS) }.
+// `bubble` : texte de la bulle. Les couches eat1..eat3 et le sprite carotte viennent de companion-data.js.
+export const ACTIONS = {
+  cat: {
+    bubble: "Miaou !",
+    steps: [{ layer: "happy", ms: 1400, fx: "meow" }, { layer: "proud", ms: 1500 }],
+  },
+  unicorn: {
+    steps: [{ layer: "proud", ms: 500 }, { layer: "happy", ms: 2300, fx: "rainbow" }, { layer: "proud", ms: 800 }],
+  },
+  rabbit: {
+    steps: [
+      { layer: "happy", ms: 500 },
+      { layer: "happy", ms: 700, fx: "carrot-in" },
+      { layer: "eat1", ms: 800, fx: "nibble" },
+      { layer: "eat2", ms: 1300, fx: "nibble" },
+      { layer: "eat3", ms: 1100, fx: "nibble" },
+      { layer: "happy", ms: 800 },
+    ],
+  },
+};
+
+export function actionDuration(id) {
+  const a = ACTIONS[id];
+  return a ? a.steps.reduce((t, st) => t + st.ms, 0) : 0;
+}
+
+// Assemble un compagnon : une couche par image (fondu enchaîné), pupilles mobiles sur les têtes aux yeux vides,
+// accessoires (zzz, ?, !, étoile, goutte) et effets des animations (bulle, rayon, carotte). `companion` vient de companion-data.js.
+export function buildAvatar(companion, id) {
   const box = el("div", "avatar avatar--idle");
+  if (id) box.classList.add("avatar--" + id);
   const body = el("div", "avatar__body");
-  MOODS.forEach((mood) => {
+  Object.keys(companion.moods).forEach((mood) => {
     const m = companion.moods[mood];
-    if (!m) return;
-    const layer = el("div", "avatar__layer avatar__layer--" + mood);
+    const layer = el("div", "avatar__layer");
+    layer.dataset.layer = mood;
     const img = el("img", "avatar__img");
     img.src = m.img;
     img.alt = "";
@@ -113,12 +141,61 @@ export function buildAvatar(companion) {
   box.appendChild(el("span", "avatar__prop avatar__prop--bang", "!"));
   box.appendChild(el("span", "avatar__prop avatar__prop--star", "\u2605"));
   box.appendChild(el("span", "avatar__prop avatar__prop--drop"));
+  const action = ACTIONS[id];
+  if (action && action.bubble) box.appendChild(el("span", "avatar__bubble", action.bubble));
+  if (companion.horn) {
+    const beam = el("span", "avatar__beam");
+    beam.style.left = (companion.horn.x * 100).toFixed(2) + "%";
+    beam.style.top = (companion.horn.y * 100).toFixed(2) + "%";
+    beam.appendChild(el("span", "avatar__spark avatar__spark--1", "\u2726"));
+    beam.appendChild(el("span", "avatar__spark avatar__spark--2", "\u2726"));
+    beam.appendChild(el("span", "avatar__spark avatar__spark--3", "\u2726"));
+    box.appendChild(beam);
+  }
+  if (companion.sprites && companion.sprites.carrot) {
+    const carrot = el("img", "avatar__carrot");
+    carrot.src = companion.sprites.carrot.img;
+    carrot.alt = "";
+    carrot.draggable = false;
+    box.appendChild(carrot);
+  }
   return box;
 }
 
+function showLayer(box, name) {
+  [].slice.call(box.querySelectorAll(".avatar__layer")).forEach((l) => l.classList.toggle("is-on", l.dataset.layer === name));
+}
+
 export function setAvatarMood(box, mood) {
-  MOODS.forEach((m) => box.classList.remove("avatar--" + m));
-  box.classList.add("avatar--" + (MOODS.indexOf(mood) >= 0 ? mood : "idle"));
+  const m = MOODS.indexOf(mood) >= 0 ? mood : "idle";
+  MOODS.forEach((x) => box.classList.remove("avatar--" + x));
+  box.classList.add("avatar--" + m);
+  showLayer(box, m);
+}
+
+// Joue l'animation de clic du compagnon `id` ; rappelle done() à la fin. Sans effet si une animation est déjà en cours.
+export function playAction(box, id, done) {
+  const action = ACTIONS[id];
+  if (!action || box.classList.contains("avatar--acting")) return false;
+  setAvatarMood(box, "idle");
+  box.classList.add("avatar--acting");
+  let i = 0;
+  let fx = "";
+  function next() {
+    if (fx) box.classList.remove("avatar--fx-" + fx);
+    if (i >= action.steps.length) {
+      box.classList.remove("avatar--acting");
+      if (done) done();
+      return;
+    }
+    const st = action.steps[i++];
+    showLayer(box, st.layer);
+    fx = st.fx || "";
+    if (fx) box.classList.add("avatar--fx-" + fx);
+    setTimeout(next, st.ms);
+  }
+  next();
+  return true;
 }
 
 // Les yeux suivent le pointeur (souris, Magic Remote) : seules les pupilles bougent, pas l'avatar.

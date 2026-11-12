@@ -18,8 +18,8 @@ import { iconSvg } from "./icons.js";
 import { loadDay, loadDays, loadRange, loadInterval, totalSeconds, sortedUsage, formatDuration, appTitle } from "./screentime.js";
 import { createApi, API_BASE } from "./api.js";
 import { chartBars, shortDuration } from "./chart.js";
-import { createMoodEngine, limitRatio, buildAvatar, setAvatarMood, attachGaze } from "./avatar.js";
-import { COMPANIONS } from "./companion-data.js";
+import { createMoodEngine, limitRatio, buildAvatar, setAvatarMood, attachGaze, playAction } from "./avatar.js";
+import { COMPANIONS, COMPANION_ORDER } from "./companion-data.js";
 import { updateSummary, installErrorMessage } from "./update.js";
 import { DAILY_CHOICES, APP_CHOICES, EXTENSION_CHOICES, ACTION_CHOICES, limitLabel, lockMessage, pinPress } from "./limits.js";
 
@@ -103,27 +103,36 @@ export function render(root, catalog, env) {
   // ---------- compagnon (avatar) ----------
 
   const moodEngine = createMoodEngine();
-  let avatarBox = null;
-  let avatarId = "";
+  const avatars = {}; // id -> { box, detach }
+  let avatarSetting = "";
   let avatarMood = "";
-  let detachGaze = null;
-  // Crée (ou remplace) le compagnon choisi dans les réglages ; « aucun » le retire.
-  function setCompanion(id) {
-    if (id === avatarId) return;
-    avatarId = id;
-    if (detachGaze) { detachGaze(); detachGaze = null; }
-    if (avatarBox) { avatarBox.remove(); avatarBox = null; }
-    avatarMood = "";
-    if (!COMPANIONS[id]) return;
-    avatarBox = buildAvatar(COMPANIONS[id]);
-    document.body.appendChild(avatarBox);
-    detachGaze = attachGaze(avatarBox, document);
+  const companionsBox = document.createElement("div");
+  companionsBox.className = "companions";
+  document.body.appendChild(companionsBox);
+  // Affiche les compagnons choisis dans les réglages (« tous », un seul ou aucun), côte à côte.
+  function setCompanions(setting) {
+    if (setting === avatarSetting) return;
+    avatarSetting = setting;
+    Object.keys(avatars).forEach((id) => { avatars[id].detach(); avatars[id].box.remove(); delete avatars[id]; });
+    const ids = setting === "all" ? COMPANION_ORDER : (COMPANIONS[setting] ? [setting] : []);
+    ids.forEach((id) => {
+      const box = buildAvatar(COMPANIONS[id], id);
+      box.addEventListener("click", () => {
+        avatarEvent("touch");
+        playAction(box, id, () => setAvatarMood(box, avatarMood || "idle"));
+      });
+      companionsBox.appendChild(box);
+      setAvatarMood(box, avatarMood || "idle");
+      avatars[id] = { box, detach: attachGaze(box, document) };
+    });
     updateAvatar();
   }
   function updateAvatar() {
-    if (document.hidden || !avatarBox) return;
+    if (document.hidden) return;
     const mood = moodEngine.mood(Date.now(), { hour: new Date().getHours(), limitRatio: limitRatio(limitState), locked: !!(limitState && limitState.locked) });
-    if (mood !== avatarMood) { avatarMood = mood; setAvatarMood(avatarBox, mood); }
+    if (mood === avatarMood) return;
+    avatarMood = mood;
+    Object.keys(avatars).forEach((id) => { if (!avatars[id].box.classList.contains("avatar--acting")) setAvatarMood(avatars[id].box, mood); });
   }
   function avatarEvent(name) { moodEngine.event(name, Date.now()); updateAvatar(); }
   moodEngine.event("touch", Date.now());
@@ -148,7 +157,7 @@ export function render(root, catalog, env) {
     style.setProperty("--fs", settings.textSize === "large" ? "1.25" : "1");
     const cl = document.body.classList;
     cl.toggle("reduce-motion", settings.reduceMotion);
-    setCompanion(settings.companion);
+    setCompanions(settings.companion);
     cl.toggle("no-dock-glass", !settings.dockGlass);
     cl.toggle("dock-blur", settings.dockBlur);
     cl.toggle("settings-blur", settings.settingsBlur);

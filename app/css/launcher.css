@@ -150,20 +150,15 @@ svg { display: block; width: 100%; height: 100%; }
 .pinkey--wide { width: 324px; font-size: 28px; }
 .pinkey--focused { background: #fff; color: #10151f; transform: scale(1.08); box-shadow: 0 14px 30px rgba(0, 0, 0, 0.4); }
 
-/* ---------- compagnon (avatar) ---------- */
-.avatar { position: fixed; z-index: 3; right: calc(var(--edge) + 6px); top: 190px; width: 150px; height: 150px; pointer-events: none; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4)); }
-.in-settings .avatar { display: none; }
+/* ---------- compagnons (avatars) ---------- */
+.companions { position: fixed; z-index: 3; right: calc(var(--edge) + 6px); top: 190px; display: flex; gap: 6px; }
+.in-settings .companions { display: none; }
+.avatar { position: relative; width: 130px; height: 130px; cursor: pointer; filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.4)); }
 .avatar__body { position: absolute; inset: 0; transform-origin: 50% 100%; animation: avatar-bob 3.2s ease-in-out infinite; }
 .avatar__layer { position: absolute; inset: 0; opacity: 0; transition: opacity 0.22s ease; }
+.avatar__layer.is-on { opacity: 1; }
 .avatar__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; user-select: none; }
 .avatar__pupil { position: absolute; transform: translate(-50%, -50%); user-select: none; }
-.avatar--idle .avatar__layer--idle,
-.avatar--happy .avatar__layer--happy,
-.avatar--curious .avatar__layer--curious,
-.avatar--worried .avatar__layer--worried,
-.avatar--proud .avatar__layer--proud,
-.avatar--sleepy .avatar__layer--sleepy,
-.avatar--surprised .avatar__layer--surprised { opacity: 1; }
 .avatar__prop { position: absolute; opacity: 0; color: #fff; font: 700 26px sans-serif; text-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
 .avatar__prop--zzz { right: 0; top: 4px; }
 .avatar__prop--ask, .avatar__prop--bang, .avatar__prop--star { right: 2px; top: 2px; }
@@ -187,4 +182,26 @@ svg { display: block; width: 100%; height: 100%; }
 @keyframes avatar-shake { 0%, 100% { transform: translateX(-2px); } 50% { transform: translateX(2px); } }
 @keyframes avatar-pop { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.35); } }
 @keyframes avatar-float { 0% { transform: translateY(0); } 100% { transform: translateY(-8px); } }
+
+/* animations déclenchées par un clic */
+.avatar__bubble { position: absolute; left: 50%; top: -14px; transform: translateX(-50%) scale(0); opacity: 0; white-space: nowrap; background: #fff; color: #2a2a3a; font: 700 20px sans-serif; padding: 4px 12px; border-radius: 16px; box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35); }
+.avatar--fx-meow .avatar__bubble { animation: avatar-bubble 1.4s ease-out forwards; }
+.avatar--fx-meow .avatar__body { animation: avatar-meow 0.35s ease-in-out 4; }
+.avatar__beam { position: absolute; width: 300px; height: 28px; margin-top: -14px; transform-origin: 0 50%; transform: rotate(-32deg) scaleX(0); opacity: 0; border-radius: 14px; z-index: 2;
+  background: linear-gradient(to bottom, #ff5a5f 0, #ff5a5f 14.3%, #ffa94d 14.3%, #ffa94d 28.6%, #ffe066 28.6%, #ffe066 42.9%, #69db7c 42.9%, #69db7c 57.2%, #4dabf7 57.2%, #4dabf7 71.5%, #5c7cfa 71.5%, #5c7cfa 85.8%, #be4bdb 85.8%);
+  -webkit-mask-image: linear-gradient(to right, #000 65%, transparent); mask-image: linear-gradient(to right, #000 65%, transparent); }
+.avatar--fx-rainbow .avatar__beam { animation: avatar-beam 2.3s ease-out forwards; }
+.avatar__spark { position: absolute; top: -14px; color: #fff; font-size: 22px; text-shadow: 0 0 8px #fff; opacity: 0; }
+.avatar__spark--1 { left: 30%; } .avatar__spark--2 { left: 55%; top: 20px; } .avatar__spark--3 { left: 75%; top: -20px; }
+.avatar--fx-rainbow .avatar__spark { animation: avatar-twinkle 0.8s ease-in-out infinite; }
+.avatar--fx-rainbow .avatar__spark--2 { animation-delay: 0.25s; } .avatar--fx-rainbow .avatar__spark--3 { animation-delay: 0.5s; }
+.avatar__carrot { position: absolute; left: 50%; bottom: 0; width: 34%; z-index: 2; transform: translate(-50%, 130%); opacity: 0; }
+.avatar--fx-carrot-in .avatar__carrot { animation: avatar-carrot-in 0.7s ease-out forwards; }
+.avatar--fx-nibble .avatar__body { animation: avatar-chew 0.28s ease-in-out infinite; }
+@keyframes avatar-bubble { 0% { transform: translateX(-50%) scale(0); opacity: 0; } 15% { transform: translateX(-50%) scale(1.1); opacity: 1; } 25%, 80% { transform: translateX(-50%) scale(1); opacity: 1; } 100% { transform: translateX(-50%) scale(1); opacity: 0; } }
+@keyframes avatar-meow { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.05, 0.95) translateY(2px); } }
+@keyframes avatar-beam { 0% { opacity: 0; transform: rotate(-32deg) scaleX(0); } 12% { opacity: 1; } 50% { opacity: 1; transform: rotate(-32deg) scaleX(1); } 85% { opacity: 1; transform: rotate(-32deg) scaleX(1); } 100% { opacity: 0; transform: rotate(-32deg) scaleX(1); } }
+@keyframes avatar-twinkle { 0%, 100% { opacity: 0; transform: scale(0.4); } 50% { opacity: 1; transform: scale(1.2); } }
+@keyframes avatar-carrot-in { 0% { opacity: 0; transform: translate(-50%, 130%) rotate(-14deg); } 100% { opacity: 1; transform: translate(-50%, 8%) rotate(0); } }
+@keyframes avatar-chew { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.03, 0.97) translateY(1px); } }
 .reduce-motion .avatar__body, .reduce-motion .avatar__prop { animation: none !important; }

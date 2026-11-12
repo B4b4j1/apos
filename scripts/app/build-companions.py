@@ -35,6 +35,9 @@ MOODS = {
     "sleepy": ("pose-sleep", "pose"),
     "surprised": ("pose-jump", "pose"),
 }
+# images en plus, propres à un compagnon (animation au clic) : têtes supplémentaires et accessoire
+EXTRA_HEADS = {"rabbit": {"eat1": "eat1", "eat2": "eat2", "eat3": "eat3"}}
+SPRITES = {"rabbit": {"carrot": ("carrot", 160)}}
 
 
 def alpha_bbox(im, threshold=16):
@@ -111,6 +114,17 @@ def find_eyes(im):
     return [{"x": round(c["cx"] / SCAN, 4), "y": round(c["cy"] / SCAN, 4), "w": round(c["w"] / SCAN, 4), "h": round(c["h"] / SCAN, 4)} for c in best[1]]
 
 
+def find_horn(im):
+    """Pointe de la corne : point le plus haut de la tête (fraction de l'image)."""
+    a = im.getchannel("A").resize((SCAN, SCAN), Image.LANCZOS)
+    px = a.load()
+    for y in range(SCAN):
+        xs = [x for x in range(SCAN) if px[x, y] > 128]
+        if xs:
+            return {"x": round(sum(xs) / len(xs) / SCAN, 4), "y": round((y + 6) / SCAN, 4)}
+    return None
+
+
 def save_webp(im, path):
     os.makedirs(os.path.dirname(path), exist_ok=True)
     im.save(path, "WEBP", quality=84, method=6)
@@ -121,8 +135,9 @@ def build(cid):
     src = os.path.join(SRC, cid)
     load = lambda name: Image.open(os.path.join(src, name + ".png")).convert("RGBA")
     heads = {m: load(f) for m, (f, kind) in MOODS.items() if kind == "head"}
+    extras = {m: load(f) for m, f in EXTRA_HEADS.get(cid, {}).items()}
     poses = {m: load(f) for m, (f, kind) in MOODS.items() if kind == "pose"}
-    head_box = square_crop(union_box(list(heads.values())))
+    head_box = square_crop(union_box(list(heads.values()) + list(extras.values())))
     pose_box = square_crop(union_box(list(poses.values())))
     moods = {}
     total = 0
@@ -140,11 +155,27 @@ def build(cid):
         if kind == "head" and m in ("idle", "curious", "worried") and not eyes:
             print("  ATTENTION : yeux non détectés pour %s/%s" % (cid, m), file=sys.stderr)
         moods[m] = entry
+    for m, im in extras.items():
+        out = crop_to(im, head_box).resize((HEAD, HEAD), Image.LANCZOS)
+        total += save_webp(out, os.path.join(OUT, cid, m + ".webp"))
+        moods[m] = {"img": "assets/companions/%s/%s.webp" % (cid, m)}
+    sprites = {}
+    for key, (fname, size) in SPRITES.get(cid, {}).items():
+        sp = load(fname)
+        sp = sp.crop(alpha_bbox(sp))
+        sp.thumbnail((size, size), Image.LANCZOS)
+        total += save_webp(sp, os.path.join(OUT, cid, key + ".webp"))
+        sprites[key] = {"img": "assets/companions/%s/%s.webp" % (cid, key), "ratio": round(sp.width / sp.height, 3)}
     pupil = load("pupil")
     pupil = pupil.crop(alpha_bbox(pupil)).resize((PUPIL, PUPIL), Image.LANCZOS)
     total += save_webp(pupil, os.path.join(OUT, cid, "pupil.webp"))
     print("%-8s %6.1f Ko  %s" % (cid, total / 1024, {m: len(v.get("eyes", [])) for m, v in moods.items()}))
-    return {"label": LABELS[cid], "pupil": "assets/companions/%s/pupil.webp" % cid, "moods": moods}
+    entry = {"label": LABELS[cid], "pupil": "assets/companions/%s/pupil.webp" % cid, "moods": moods}
+    if sprites:
+        entry["sprites"] = sprites
+    if cid == "unicorn":
+        entry["horn"] = find_horn(crop_to(heads["happy"], head_box))
+    return entry
 
 
 def main():

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync } from "fs";
 import { resolve } from "path";
-import { createMoodEngine, limitRatio, isNight, gaze, pupilGeometry, SLEEP_AFTER_MS, MOODS } from "../js/avatar.js";
+import { createMoodEngine, limitRatio, isNight, gaze, pupilGeometry, ACTIONS, actionDuration, SLEEP_AFTER_MS, MOODS } from "../js/avatar.js";
 import { COMPANIONS, COMPANION_ORDER } from "../js/companion-data.js";
 import { GROUPS, sanitize } from "../js/settings.js";
 
@@ -110,11 +110,12 @@ describe("pupil geometry", () => {
 
 describe("companion data", () => {
   const root = resolve(__dirname, "..");
-  it("offers the three companions chosen in the settings, plus none", () => {
+  it("offers all three companions, each one alone, or none", () => {
     const item = GROUPS.reduce((acc, g) => acc.concat(g.items), []).filter((i) => i.key === "companion")[0];
-    expect(item.choices.map((c) => c.value)).toEqual(["none"].concat(COMPANION_ORDER));
+    expect(item.choices.map((c) => c.value)).toEqual(["all"].concat(COMPANION_ORDER, ["none"]));
+    expect(item.default).toBe("all");
     expect(sanitize({ companion: "unicorn" }).companion).toBe("unicorn");
-    expect(sanitize({ companion: "dragon" }).companion).toBe(item.default);
+    expect(sanitize({ companion: "dragon" }).companion).toBe("all");
     expect(sanitize({ avatar: false }).companion).toBe("none");
     expect(sanitize({ avatar: false, companion: "rabbit" }).companion).toBe("rabbit");
   });
@@ -138,3 +139,32 @@ describe("companion data", () => {
     });
   });
 });
+
+describe("click actions", () => {
+  const root = resolve(__dirname, "..");
+  it("has an animation for each companion, with the effects and images it needs", () => {
+    COMPANION_ORDER.forEach((id) => {
+      const a = ACTIONS[id];
+      const c = COMPANIONS[id];
+      expect(a.steps.length).toBeGreaterThan(1);
+      a.steps.forEach((st) => {
+        expect(c.moods[st.layer]).toBeDefined();
+        expect(st.ms).toBeGreaterThan(0);
+      });
+      expect(actionDuration(id)).toBeGreaterThan(1500);
+      expect(actionDuration(id)).toBeLessThan(8000);
+    });
+    expect(ACTIONS.cat.bubble).toBe("Miaou !");
+    expect(ACTIONS.unicorn.steps.some((st) => st.fx === "rainbow")).toBe(true);
+    expect(COMPANIONS.unicorn.horn.y).toBeLessThan(0.2);
+    expect(["eat1", "eat2", "eat3"].every((l) => COMPANIONS.rabbit.moods[l])).toBe(true);
+    expect(existsSync(resolve(root, COMPANIONS.rabbit.sprites.carrot.img))).toBe(true);
+    expect(actionDuration("unknown")).toBe(0);
+  });
+  it("has the images of every extra layer", () => {
+    COMPANION_ORDER.forEach((id) => {
+      Object.keys(COMPANIONS[id].moods).forEach((l) => expect(existsSync(resolve(root, COMPANIONS[id].moods[l].img))).toBe(true));
+    });
+  });
+});
+
