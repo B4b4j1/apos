@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { createMoodEngine, limitRatio, isNight, SLEEP_AFTER_MS, MOODS } from "../js/avatar.js";
+import { createMoodEngine, limitRatio, isNight, gaze, SLEEP_AFTER_MS, MOODS } from "../js/avatar.js";
 
 const DAY = { hour: 14, limitRatio: 0, locked: false };
 
@@ -64,5 +64,27 @@ describe("helpers", () => {
     expect(limitRatio({ config: { daily_limit: 0 }, total: 500 })).toBe(0);
     expect(limitRatio({ config: { daily_limit: 3600 }, total: 1800 })).toBe(0.5);
     expect(limitRatio({ config: { daily_limit: 100 }, total: 900 })).toBe(2);
+  });
+});
+
+describe("gaze", () => {
+  it("stays centred when the pointer is on the avatar", () => {
+    expect(gaze(0, 0)).toEqual({ x: 0, y: 0 });
+  });
+  it("looks toward the pointer, further when it is further away", () => {
+    const near = gaze(50, 0);
+    const far = gaze(2000, 0);
+    expect(near.x).toBeGreaterThan(0);
+    expect(near.y).toBe(0);
+    expect(far.x).toBeGreaterThan(near.x);
+    expect(gaze(-2000, 0).x).toBeLessThan(0);
+    expect(gaze(0, -2000).y).toBeLessThan(0);
+    expect(gaze(0, 2000).y).toBeGreaterThan(0);
+  });
+  it("never leaves the eye whatever the distance or angle", () => {
+    for (let a = 0; a < 360; a += 15) {
+      const g = gaze(Math.cos(a * Math.PI / 180) * 5000, Math.sin(a * Math.PI / 180) * 5000);
+      expect((g.x / 3.5) ** 2 + (g.y / 5.5) ** 2).toBeLessThanOrEqual(1.0001);
+    }
   });
 });

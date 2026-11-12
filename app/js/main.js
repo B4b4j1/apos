@@ -18,7 +18,7 @@ import { iconSvg } from "./icons.js";
 import { loadDay, loadDays, loadRange, loadInterval, totalSeconds, sortedUsage, formatDuration, appTitle } from "./screentime.js";
 import { createApi, API_BASE } from "./api.js";
 import { chartBars, shortDuration } from "./chart.js";
-import { createMoodEngine, limitRatio, buildAvatar, setAvatarMood } from "./avatar.js";
+import { createMoodEngine, limitRatio, buildAvatar, setAvatarMood, attachGaze } from "./avatar.js";
 import { updateSummary, installErrorMessage } from "./update.js";
 import { DAILY_CHOICES, APP_CHOICES, EXTENSION_CHOICES, ACTION_CHOICES, limitLabel, lockMessage, pinPress } from "./limits.js";
 
@@ -105,6 +105,7 @@ export function render(root, catalog, env) {
   const avatarBox = buildAvatar();
   let avatarMood = "";
   document.body.appendChild(avatarBox);
+  attachGaze(avatarBox, document);
   function updateAvatar() {
     if (document.hidden) return;
     const mood = moodEngine.mood(Date.now(), { hour: new Date().getHours(), limitRatio: limitRatio(limitState), locked: !!(limitState && limitState.locked) });

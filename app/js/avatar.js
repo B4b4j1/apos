@@ -45,6 +45,20 @@ export function limitRatio(state) {
 }
 
 const NS = "http://www.w3.org/2000/svg";
+const EYE_RX = 8;
+const EYE_RY = 10;
+const PUPIL_R = 4.5;
+const GAZE_REACH_PX = 260; // distance au pointeur à partir de laquelle les pupilles sont au bord de l'œil
+const GAZE_IDLE_MS = 6000; // pointeur immobile ou masqué : les yeux reviennent au centre
+
+// Décalage de la pupille (unités du dessin) pour regarder dans la direction (dx, dy) en pixels.
+// Reste à l'intérieur de l'œil (ellipse) ; proportionnel à la distance jusqu'à GAZE_REACH_PX.
+export function gaze(dx, dy) {
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (!(dist > 0)) return { x: 0, y: 0 };
+  const strength = Math.min(1, dist / GAZE_REACH_PX);
+  return { x: (dx / dist) * strength * (EYE_RX - PUPIL_R), y: (dy / dist) * strength * (EYE_RY - PUPIL_R) };
+}
 
 function node(name, attrs, cls) {
   const n = document.createElementNS(NS, name);
@@ -62,8 +76,12 @@ export function buildAvatar() {
   body.appendChild(node("circle", { cx: 60, cy: 64, r: 42 }, "avatar__skin"));
   body.appendChild(node("circle", { cx: 38, cy: 78, r: 6 }, "avatar__cheek"));
   body.appendChild(node("circle", { cx: 82, cy: 78, r: 6 }, "avatar__cheek"));
-  body.appendChild(node("ellipse", { cx: 46, cy: 58, rx: 5, ry: 7 }, "avatar__eye avatar__eye--l"));
-  body.appendChild(node("ellipse", { cx: 74, cy: 58, rx: 5, ry: 7 }, "avatar__eye avatar__eye--r"));
+  [["l", 46], ["r", 74]].forEach((e) => {
+    const eye = node("g", {}, "avatar__eye avatar__eye--" + e[0]);
+    eye.appendChild(node("ellipse", { cx: e[1], cy: 58, rx: EYE_RX, ry: EYE_RY }, "avatar__sclera"));
+    eye.appendChild(node("circle", { cx: e[1], cy: 58, r: PUPIL_R }, "avatar__pupil"));
+    body.appendChild(eye);
+  });
   body.appendChild(node("path", { d: "M48 78 Q60 90 72 78" }, "avatar__mouth avatar__mouth--smile"));
   body.appendChild(node("path", { d: "M50 82 L70 82" }, "avatar__mouth avatar__mouth--flat"));
   body.appendChild(node("ellipse", { cx: 60, cy: 82, rx: 7, ry: 8 }, "avatar__mouth avatar__mouth--open"));
@@ -82,4 +100,31 @@ export function buildAvatar() {
 export function setAvatarMood(box, mood) {
   MOODS.forEach((m) => box.classList.remove("avatar--" + m));
   box.classList.add("avatar--" + (MOODS.indexOf(mood) >= 0 ? mood : "idle"));
+}
+
+// Les yeux suivent le pointeur (souris, Magic Remote) : seules les pupilles bougent, pas l'avatar.
+export function attachGaze(box, target) {
+  const pupils = [].slice.call(box.querySelectorAll(".avatar__pupil"));
+  const eyes = [].slice.call(box.querySelectorAll(".avatar__eye"));
+  let pending = null;
+  let idleTimer = null;
+  function look(x, y) {
+    pupils.forEach((p) => p.setAttribute("transform", "translate(" + x.toFixed(2) + " " + y.toFixed(2) + ")"));
+  }
+  function apply() {
+    const pt = pending;
+    pending = null;
+    if (!pt || box.offsetWidth === 0) return;
+    const r = box.getBoundingClientRect();
+    const g = gaze(pt.x - (r.left + r.width / 2), pt.y - (r.top + r.height * 0.48));
+    look(g.x, g.y);
+  }
+  target.addEventListener("mousemove", (ev) => {
+    const first = pending === null;
+    pending = { x: ev.clientX, y: ev.clientY };
+    if (first) requestAnimationFrame(apply);
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => look(0, 0), GAZE_IDLE_MS);
+  });
+  return eyes.length;
 }
