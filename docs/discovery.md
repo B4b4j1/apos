@@ -23,3 +23,11 @@
 - Services Luna candidats à traiter (non décidé, à valider avec l'utilisateur) : `com.webos.service.acr` (reconnaissance automatique de contenu), `com.webos.service.admanager`, `com.webos.service.adoverlay`, `com.webos.service.familycare`, `com.webos.service.iotclient`, `com.webos.service.sportsalert`, `com.webos.service.tvstorepolicy`, `com.webos.service.hbbtv.serviceendpoints`, `com.webos.service.lsa`, `com.webos.service.billing`, `com.webos.service.google.signin`, `com.webos.service.universalqcard`, `com.webos.service.homeconnect`, `com.webos.service.matter`.
 - Applications préinstallées : beaucoup de services de streaming (Netflix, Amazon, Disney+, Molotov, Pluto TV, Twitch, etc.) ; leur désactivation est une décision à part.
 - Version de firmware exacte : non relevée (la commande `luna-send` n'a rien renvoyé). Le numéro fourni par l'utilisateur (10.3.2-33) est une version webOS et ne correspond pas forcément au format « 13.40.90 » de CanI.RootMy.TV : à confirmer dans Réglages > Général > À propos de ce téléviseur (« Version du logiciel »).
+
+## Tentative d'installation du launcher (2026-11-12)
+- `ares-setup-device` : appareil `tv` enregistré (root@192.168.1.28:22, clé `openSsh: tv_apos`) ; `ares-device -i` répond (modèle 43UR74006LB, SDK 10.3.2, firmware 33.31.75).
+- `ares-install --device tv dist/com.apos.launcher_0.1.0_all.ipk` échoue : « Unable to exec » (le serveur SSH refuse le canal d'exécution demandé par ares).
+- `luna-send` lancé en SSH ne renvoie rien (pas de réponse, code 0) : le bus Luna n'est pas joignable depuis une session SSH root.
+- Les apps déjà installées (`/media/developer/apps/usr/palm/applications/`) : org.webosbrew.hbchannel, org.webosbrew.appupdateblocker, tv.stremioorigin.app, youtube.leanback.v4, ooo.lew.lifesgoodwithoutspying.
+- Le paquet copié dans `/media/developer/` pour un essai a été supprimé.
+- Aucun changement durable sur la TV ; le launcher n'est pas installé.
