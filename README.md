@@ -16,8 +16,14 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 - Au lancement, l'app lit `assets/wallpapers/index.json` : diaporama par défaut (nouvelle photo toutes les 60 s, fondu enchaîné). Dans le dock : Réglages ApOS pour choisir Diaporama, Aucun fond ou une photo fixe.
 - Des fonds peuvent aussi être déclarés à la main dans `app/config/wallpapers.js`. Aucune image n'est téléchargée : `scripts/app/package.sh` échoue si une référence `http(s)://` se trouve dans le paquet.
 
+## Réglages d'ApOS (style Lumen)
+- Accueil : horloge en haut à gauche, deux boutons ronds en haut à droite (Sources, Réglages), dock en verre avec la rangée d'apps.
+- Appui long sur OK (ou bouton rouge) sur une tuile : réorganisation, flèches pour déplacer, OK pour valider.
+- Réglages > Applications : masquer des apps ; Fonds d'écran : diaporama, photo fixe, durée, assombrissement ; Horloge : disposition (une ligne / empilée), position, 24 h / 12 h, date, secondes, taille ; Apparence : taille, forme et style des tuiles, noms, mise en valeur, taille du texte, animations, dock en verre, flous ; Système : réglages LG, accueil LG, recharger, à propos.
+- Tous les réglages sont mémorisés dans le stockage local de l'app. La météo de Lumen n'est pas reprise : elle exige des appels réseau.
+
 ## Liste des apps (launcher)
-- Une app web ne peut pas lister les apps via Luna. `bash scripts/device/refresh-apps.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin) génère sur la TV `config/launchpoints.json` et copie les icônes. À relancer après l'ajout ou la suppression d'une app, ou après une réinstallation d'ApOS.
+- Une app web ne peut pas lister les apps via Luna. `bash scripts/device/refresh-apps.sh <ip-tv>` (avec `APOS_SSH_OPTS="-i ~/.ssh/tv_apos"` si besoin) génère sur la TV `config/launchpoints.json`, copie les icônes et calcule la couleur de tuile de chaque app (sur le Mac, avec Pillow). À relancer après l'ajout ou la suppression d'une app, ou après une réinstallation d'ApOS.
 
 ## Tests
 - Python : `build/venv/bin/python -m pytest tools blocklist scripts` (venv à créer dans `build/` avec pytest et pillow)

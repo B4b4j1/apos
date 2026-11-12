@@ -10,3 +10,4 @@ app/assets/wallpapers/*
 !app/assets/wallpapers/.gitkeep
 app/assets/icons/
 .DS_Store
+app/config/launchpoints.json

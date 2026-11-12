@@ -35,6 +35,14 @@ describe("normalizeApps", () => {
     const apps = normalizeApps({ launchPoints: [{ id: "a" }, { title: "no id" }, null, { id: "a", title: "dup" }] });
     expect(apps).toEqual([{ id: "a", title: "a", icon: "" }]);
   });
+  it("keeps a valid tile color and drops anything else", () => {
+    const apps = normalizeApps({ apps: [
+      { id: "a", title: "A", color: "#aabbcc" },
+      { id: "b", title: "B", color: "red; background:url(x)" },
+    ] });
+    expect(apps[0].color).toBe("#aabbcc");
+    expect("color" in apps[1]).toBe(false);
+  });
   it("returns an empty list for unusable input", () => {
     expect(normalizeApps(null)).toEqual([]);
     expect(normalizeApps({})).toEqual([]);

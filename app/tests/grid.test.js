@@ -37,4 +37,11 @@ describe("createGrid", () => {
     g.setLengths([2]);
     expect(g.position).toEqual({ row: 0, col: 1 });
   });
+  it("sets an explicit position, clamped to the grid", () => {
+    const g = createGrid([3, 2]);
+    g.setPosition(1, 5);
+    expect(g.position).toEqual({ row: 1, col: 1 });
+    g.setPosition(9, 0);
+    expect(g.position.row).toBe(0);
+  });
 });

@@ -18,7 +18,9 @@ export function normalizeApps(resp) {
     if (e === null || typeof e !== "object" || typeof e.id !== "string" || e.id === "") return;
     if (e.visible === false || HIDDEN_IDS[e.id] || seen[e.id]) return;
     seen[e.id] = true;
-    out.push({ id: e.id, title: typeof e.title === "string" && e.title ? e.title : e.id, icon: iconUrl(e.icon) });
+    const app = { id: e.id, title: typeof e.title === "string" && e.title ? e.title : e.id, icon: iconUrl(e.icon) };
+    if (typeof e.color === "string" && /^#[0-9a-fA-F]{6}$/.test(e.color)) app.color = e.color;
+    out.push(app);
   });
   return out;
 }

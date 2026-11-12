@@ -23,6 +23,7 @@ export function createGrid(initialLengths) {
   return {
     get position() { return { row: pos.row, col: pos.col }; },
     setLengths(next) { lengths = next.slice(); clamp(); },
+    setPosition(row, col) { pos.row = row; pos.col = col; clamp(); },
     move(dir) {
       if (dir === "left") pos.col = Math.max(0, pos.col - 1);
       if (dir === "right") pos.col = Math.min(Math.max(0, lengths[pos.row] - 1), pos.col + 1);
