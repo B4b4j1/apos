@@ -32,3 +32,9 @@
 - Le paquet copié dans `/media/developer/` pour un essai a été supprimé.
 - Aucun changement durable sur la TV ; le launcher n'est pas installé.
 - Essai via la méthode « Manual » du README Homebrew Channel (`luna-send-pub -i luna://com.webos.appInstallService/dev/install`, `ipkUrl` dans /tmp) : aucune réponse, aucune app installée. Le fichier temporaire a été supprimé.
+
+## Réglages Homebrew Channel (captures utilisateur, 2026-11-12)
+- webosbrew version 0.7.3 ; Root status : ok.
+- Telnet : désactivé. SSH Server : activé. Block system updates : activé. Failsafe mode : désactivé.
+- Dépôts : repo.webosbrew.org (défaut) et repo.webosbrew.org « Extra non-free software », tous deux activés. Bouton « Add repository » présent.
+- Reboot requis après changement de configuration.
