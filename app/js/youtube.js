@@ -2,11 +2,13 @@
 // webOS ne dit pas quelle vidéo a été regardée dans YouTube : on retient seulement la dernière ouverture depuis l'accueil.
 export const RECENT_KEY = "apos.youtube.recent";
 const SAFE_HANDLE = /^@[A-Za-z0-9._-]+$/;
+const SAFE_CHANNEL_ID = /^UC[A-Za-z0-9_-]{22}$/;
 // Adresse composée ici : ce n'est qu'un paramètre transmis à l'app YouTube, ApOS ne charge rien depuis le réseau.
 const BASE = ["https:", "", "www.youtube.com", ""].join("/");
 
 export function channelUrl(channel) {
-  return BASE + channel.handle;
+  // Page chaîne de l'interface TV de YouTube (l'URL « @nom » du site web ouvrirait seulement l'accueil).
+  return BASE + "tv#/browse?c=" + channel.channelId;
 }
 
 export function launchParams(channel) {
@@ -14,7 +16,7 @@ export function launchParams(channel) {
 }
 
 export function validChannels(list) {
-  return (Array.isArray(list) ? list : []).filter((c) => c && typeof c.id === "string" && typeof c.title === "string" && typeof c.handle === "string" && SAFE_HANDLE.test(c.handle));
+  return (Array.isArray(list) ? list : []).filter((c) => c && typeof c.id === "string" && typeof c.title === "string" && typeof c.handle === "string" && SAFE_HANDLE.test(c.handle) && typeof c.channelId === "string" && SAFE_CHANNEL_ID.test(c.channelId));
 }
 
 export function readRecents(storage) {

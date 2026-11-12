@@ -1,11 +1,12 @@
 {
   "id": "com.apos.launcher",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "vendor": "ApOS",
   "type": "web",
   "main": "index.html",
   "title": "ApOS",
   "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
   "requiredPermissions": [],
   "resolution": "1920x1080",
   "requiredACG": [],

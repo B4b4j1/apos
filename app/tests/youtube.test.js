@@ -11,19 +11,20 @@ function memory() {
 describe("youtube channels", () => {
   it("lists the three requested channels with safe direct links", () => {
     expect(YOUTUBE_APP_ID).toBe("youtube.leanback.v4");
+    expect(CHANNELS.map((c) => c.handle)).toEqual(["@3-kota", "@malyshariki", "@BlueyFrancais"]);
     expect(CHANNELS.map(channelUrl)).toEqual([
-      "https://www.youtube.com/@3-kota",
-      "https://www.youtube.com/@malyshariki",
-      "https://www.youtube.com/@BlueyFrancais",
+      "https://www.youtube.com/tv#/browse?c=UCdSaNPMpj-Vi_SF6_MAFpSw",
+      "https://www.youtube.com/tv#/browse?c=UCn8CnDy4-uzkxXzXPSzQZ0A",
+      "https://www.youtube.com/tv#/browse?c=UCrGR1w7FATM8OiK_EzN3GAw",
     ]);
     expect(validChannels(CHANNELS)).toHaveLength(3);
   });
   it("rejects other hosts and malformed entries", () => {
-    expect(validChannels([{ id: "x", title: "X", handle: "https://evil.test/@x" }, null, { id: 1 }, { id: "y", title: "Y", handle: "y" }])).toEqual([]);
+    expect(validChannels([{ id: "x", title: "X", handle: "https://evil.test/@x" }, null, { id: 1 }, { id: "y", title: "Y", handle: "y" }, { id: "z", title: "Z", handle: "@z", channelId: "bad" }])).toEqual([]);
     expect(validChannels(null)).toEqual([]);
   });
   it("builds launch params carrying the url", () => {
-    expect(launchParams(CHANNELS[0])).toEqual({ contentTarget: "https://www.youtube.com/@3-kota" });
+    expect(launchParams(CHANNELS[0])).toEqual({ contentTarget: "https://www.youtube.com/tv#/browse?c=UCdSaNPMpj-Vi_SF6_MAFpSw" });
   });
   it("orders the last opened channel first and keeps config order otherwise", () => {
     expect(orderChannels(CHANNELS, {}).map((c) => c.id)).toEqual(["3-kota", "malyshariki", "blueyfrancais"]);
