@@ -67,3 +67,7 @@ html, body { margin: 0; padding: 0; width: 1920px; height: 1080px; overflow: hid
 .row--dock .tile__label { margin-top: 12px; font-size: 22px; }
 
 .status { position: absolute; left: var(--edge); bottom: 18px; z-index: 3; font-size: 18px; color: var(--text-muted); }
+
+/* tuile soulevée pendant la réorganisation */
+.tile--lifted .tile__box { transform: scale(1.24) translateY(-14px); box-shadow: 0 44px 70px rgba(0, 0, 0, 0.65), 0 14px 26px rgba(0, 0, 0, 0.4); }
+.tile--lifted .tile__label { opacity: 1; }

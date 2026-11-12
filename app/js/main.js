@@ -7,6 +7,7 @@ import { FALLBACK_APPS } from "../config/fallback-apps.js";
 import { DOCK } from "../config/dock.js";
 import { validWallpapers, readChoice, saveChoice, resolveMode, SLIDESHOW_ID } from "./wallpaper.js";
 import { createSlideshow } from "./slideshow.js";
+import { applyOrder, moveId, readOrder, saveOrder } from "./order.js";
 import { launchApp } from "./luna.js";
 import { normalizeApps } from "./apps.js";
 import { formatTime } from "./clock.js";
@@ -14,6 +15,7 @@ import { formatTime } from "./clock.js";
 const TILE_STEP = 236 + 28;
 const VISIBLE = 6;
 const SLIDESHOW_MS = 60000; // une nouvelle photo toutes les 60 s
+const LONG_PRESS_MS = 700; // maintien de OK : mode réorganisation
 
 function el(tag, className, text) {
   const node = document.createElement(tag);
@@ -56,6 +58,10 @@ export function render(root, catalog, env) {
   const stack = ["home"];
   let screen = null; // { rows: [{kind, entries}], grid, rowEls }
   let grid = null;
+  let reordering = false;
+  let pressTimer = null;
+  let longFired = false;
+  let swallowSelectUp = false;
 
   // Deux calques superposés : la nouvelle photo apparaît en fondu par-dessus l'ancienne.
   let layers = null;
@@ -102,7 +108,8 @@ export function render(root, catalog, env) {
   function appEntries() {
     const seen = {};
     const merged = pinned.concat(apps || []).filter((a) => !seen[a.id] && (seen[a.id] = true));
-    return merged.map((a) => ({
+    return applyOrder(merged, readOrder(storage)).map((a) => ({
+      id: a.id,
       label: a.title,
       icon: a.icon,
       onSelect: () => launch(a.id).catch((err) => say("Lancement impossible : " + err.message)),
@@ -154,7 +161,10 @@ export function render(root, catalog, env) {
     const pos = grid.position;
     screen.rowEls.forEach((rowEl, r) => {
       rowEl.row.classList.toggle("row--focused", r === pos.row);
-      rowEl.tiles.forEach((t, c) => t.classList.toggle("tile--focused", r === pos.row && c === pos.col));
+      rowEl.tiles.forEach((t, c) => {
+        t.classList.toggle("tile--focused", r === pos.row && c === pos.col);
+        t.classList.toggle("tile--lifted", reordering && r === pos.row && c === pos.col);
+      });
       if (screen.rows[r].kind !== "dock") {
         const offset = r === pos.row ? Math.max(0, pos.col - (VISIBLE - 1)) * TILE_STEP : 0;
         rowEl.track.style.transform = "translateX(" + -offset + "px)";
@@ -197,6 +207,30 @@ export function render(root, catalog, env) {
     paint();
   }
 
+  // Réorganisation : la tuile « soulevée » se déplace avec ◀ ▶ ; OK ou Retour valide. L'ordre est mémorisé.
+  function enterReorder() {
+    if (stack[stack.length - 1] !== "home" || grid.position.row !== 0 || screen.rows[0].entries.length < 2) return false;
+    reordering = true;
+    say("Réorganisation : ◀ ▶ pour déplacer, OK pour valider");
+    paint();
+    return true;
+  }
+
+  function exitReorder() {
+    reordering = false;
+    say("");
+    paint();
+  }
+
+  function moveApp(dir) {
+    const ids = screen.rows[0].entries.map((e) => e.id);
+    const moved = moveId(ids, grid.position.col, dir === "left" ? -1 : 1);
+    if (moved.index === grid.position.col) return;
+    saveOrder(storage, moved.ids);
+    grid.move(dir);
+    show(true);
+  }
+
   function loadApps() {
     listApps()
       .then((resp) => {
@@ -215,14 +249,34 @@ export function render(root, catalog, env) {
   document.addEventListener("keydown", (ev) => {
     const action = keyAction(ev);
     if (!action) return;
-    if (action.type === "move") { grid.move(action.dir); paint(); return; }
     if (action.type === "select") {
-      const pos = grid.position;
-      const entry = screen.rows[pos.row].entries[pos.col];
-      if (entry && entry.onSelect) entry.onSelect();
+      if (ev.repeat) return;
+      if (reordering) { exitReorder(); swallowSelectUp = true; return; }
+      longFired = false;
+      clearTimeout(pressTimer);
+      pressTimer = setTimeout(() => { longFired = enterReorder(); }, LONG_PRESS_MS);
       return;
     }
+    if (action.type === "reorder") { if (reordering) exitReorder(); else enterReorder(); return; }
+    if (reordering) {
+      if (action.type === "move" && (action.dir === "left" || action.dir === "right")) moveApp(action.dir);
+      else if (action.type === "back") exitReorder();
+      return;
+    }
+    if (action.type === "move") { grid.move(action.dir); paint(); return; }
     goBack();
+  });
+
+  // OK agit au relâchement : un appui long ouvre la réorganisation sans lancer l'app.
+  document.addEventListener("keyup", (ev) => {
+    const action = keyAction(ev);
+    if (!action || action.type !== "select") return;
+    clearTimeout(pressTimer);
+    if (swallowSelectUp) { swallowSelectUp = false; return; }
+    if (longFired) { longFired = false; return; }
+    const pos = grid.position;
+    const entry = screen.rows[pos.row].entries[pos.col];
+    if (entry && entry.onSelect) entry.onSelect();
   });
 }
 

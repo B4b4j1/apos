@@ -50,3 +50,24 @@ def test_main_writes_images_thumbs_and_index_without_exif():
                 im = Image.open(path)
                 assert not im.getexif()
         assert Image.open(os.path.join(out, "wp-01-thumb.jpg")).size == (480, 270)
+
+
+def test_main_skips_portrait_photos_and_numbers_the_rest_sequentially():
+    with tempfile.TemporaryDirectory() as src, tempfile.TemporaryDirectory() as out:
+        Image.new("RGB", (900, 1600), "red").save(os.path.join(src, "a-portrait.jpg"))
+        Image.new("RGB", (1600, 900), "green").save(os.path.join(src, "b-wide.jpg"))
+        Image.new("RGB", (1200, 900), "blue").save(os.path.join(src, "c-4x3.jpg"))
+        rotated = Image.new("RGB", (1600, 900), "white")
+        exif = Image.Exif()
+        exif[274] = 6  # stocké en paysage mais affiché en portrait
+        rotated.save(os.path.join(src, "d-rotated.jpg"), exif=exif)
+        assert p.main([src, out]) == 0
+        index = json.load(open(os.path.join(out, "index.json")))
+        assert [e["id"] for e in index] == ["wp-01", "wp-02"]
+        assert not os.path.exists(os.path.join(out, "wp-03.jpg"))
+
+
+def test_is_portrait_uses_the_oriented_size():
+    assert p.is_portrait(Image.new("RGB", (900, 1600)))
+    assert not p.is_portrait(Image.new("RGB", (1600, 900)))
+    assert not p.is_portrait(Image.new("RGB", (900, 900)))

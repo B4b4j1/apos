@@ -3,7 +3,7 @@
 
 Usage : build/venv/bin/python scripts/app/prepare_wallpapers.py <dossier-originaux> <app/assets/wallpapers>
 Écrit wp-NN.jpg, wp-NN-thumb.jpg (480x270) et index.json dans le dossier de sortie.
-Les originaux (plusieurs dizaines de Mo, avec position GPS) ne sont jamais copiés dans l'app.
+Les photos verticales sont ignorées. Les originaux (plusieurs dizaines de Mo, avec position GPS) ne sont jamais copiés dans l'app.
 """
 import json
 import os
@@ -17,10 +17,15 @@ EXTENSIONS = (".jpg", ".jpeg", ".png", ".webp")
 LANCZOS = Image.Resampling.LANCZOS
 
 
+def is_portrait(img):
+    oriented = ImageOps.exif_transpose(img)
+    return oriented.height > oriented.width
+
+
 def fit_image(img):
-    """Image 16:9 de 1920x1080 : recadrée si proche du 16:9, sinon centrée sur un fond flouté."""
+    """Image 16:9 de 1920x1080 : recadrée (4:3 et plus larges), sinon centrée sur un fond flouté."""
     img = ImageOps.exif_transpose(img).convert("RGB")
-    if img.width / img.height >= 1.4:
+    if img.width / img.height >= 1.25:
         return ImageOps.fit(img, (WIDTH, HEIGHT), LANCZOS)
     small = ImageOps.fit(img, (WIDTH // 10, HEIGHT // 10), LANCZOS).filter(ImageFilter.GaussianBlur(6))
     background = ImageEnhance.Brightness(small.resize((WIDTH, HEIGHT), LANCZOS)).enhance(0.55)
@@ -42,8 +47,15 @@ def main(argv):
             os.remove(os.path.join(out, old))
     index = []
     total = 0
-    for i, name in enumerate(names, start=1):
+    skipped = []
+    number = 0
+    for name in names:
         with Image.open(os.path.join(src, name)) as img:
+            if is_portrait(img):
+                skipped.append(name)  # les photos verticales ne servent pas de fond d'écran
+                continue
+            number += 1
+            i = number
             if img.format == "JPEG":
                 img.draft("RGB", (WIDTH * 2, HEIGHT * 2))  # décodage JPEG réduit : bien plus rapide sur les 8064x6048
             fitted = fit_image(img)
@@ -57,6 +69,8 @@ def main(argv):
                       "thumb": "assets/wallpapers/" + wid + "-thumb.jpg"})
     with open(os.path.join(out, "index.json"), "w") as f:
         json.dump(index, f, ensure_ascii=False, indent=1)
+    for name in skipped:
+        print("ignorée (verticale) : " + name)
     print("{} photos, {:.1f} Mo au total".format(len(index), total / 1048576))
     return 0
 

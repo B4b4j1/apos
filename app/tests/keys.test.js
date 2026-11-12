@@ -15,6 +15,9 @@ describe("keyAction", () => {
     expect(keyAction({ key: "Escape", keyCode: 27 })).toEqual({ type: "back" });
     expect(keyAction({ key: "Backspace", keyCode: 8 })).toEqual({ type: "back" });
   });
+  it("maps the red remote button to reorder", () => {
+    expect(keyAction({ key: "", keyCode: 403 })).toEqual({ type: "reorder" });
+  });
   it("ignores other keys", () => {
     expect(keyAction({ key: "a", keyCode: 65 })).toBeNull();
   });
