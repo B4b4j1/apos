@@ -5,8 +5,6 @@ import { keyAction } from "./keys.js";
 import { WALLPAPERS } from "../config/wallpapers.js";
 import { FALLBACK_APPS } from "../config/fallback-apps.js";
 import { SOURCES } from "../config/sources.js";
-import { CHANNELS, YOUTUBE_APP_ID } from "../config/youtube.js";
-import { launchParams, validChannels, readRecents, markOpened, orderChannels } from "./youtube.js";
 import { validWallpapers, readChoice, saveChoice, resolveMode, SLIDESHOW_ID } from "./wallpaper.js";
 import { createSlideshow } from "./slideshow.js";
 import { applyOrder, moveId, readOrder, saveOrder } from "./order.js";
@@ -120,15 +118,18 @@ export function render(root, catalog, env) {
     const ids = setting === "all" ? COMPANION_ORDER : (COMPANIONS[setting] ? [setting] : []);
     ids.forEach((id) => {
       const box = buildAvatar(COMPANIONS[id], id);
-      box.addEventListener("click", () => {
-        avatarEvent("touch");
-        playAction(box, id, () => setAvatarMood(box, avatarMood || "idle"));
-      });
+      box.addEventListener("click", () => activateAvatar(id));
       companionsBox.appendChild(box);
       setAvatarMood(box, avatarMood || "idle");
       avatars[id] = { box, detach: attachGaze(box, document) };
     });
     updateAvatar();
+  }
+  function activateAvatar(id) {
+    const entry = avatars[id];
+    if (!entry) return;
+    avatarEvent("touch");
+    playAction(entry.box, id, () => setAvatarMood(entry.box, avatarMood || "idle"));
   }
   function updateAvatar() {
     if (document.hidden) return;
@@ -471,20 +472,6 @@ export function render(root, catalog, env) {
     return () => { avatarEvent("launch"); return launch(id).catch((err) => say("Lancement impossible : " + err.message)); };
   }
 
-  function channelEntries() {
-    return orderChannels(validChannels(CHANNELS), readRecents(storage)).map((c) => ({
-      id: c.id,
-      label: c.title,
-      monogram: c.monogram,
-      color: c.color,
-      onSelect: () => {
-        avatarEvent("launch");
-        markOpened(storage, c.id, Date.now());
-        return launch(YOUTUBE_APP_ID, launchParams(c)).catch((err) => say("Lancement impossible : " + err.message));
-      },
-    }));
-  }
-
   function appEntries() {
     return filterHidden(allApps(), hidden).map((a) => ({
       id: a.id,
@@ -499,12 +486,25 @@ export function render(root, catalog, env) {
 
   function push(build) { avatarEvent(build === settingsRootView ? "settings" : "touch"); stack.push({ build }); reordering = false; show(); }
 
+  function backToWebos() {
+    avatarEvent("launch");
+    return api.post("/home/lg", {}).then((res) => {
+      if (res.status !== 200) return launch("com.webos.app.home");
+      return null;
+    }).catch((err) => say("Lancement impossible : " + err.message));
+  }
+
+  function avatarEntries() {
+    return COMPANION_ORDER.filter((id) => avatars[id]).map((id) => ({ id, onSelect: () => activateAvatar(id) }));
+  }
+
   function homeView() {
     const topButtons = [
       { label: "Sources", icon: "sources", onSelect: () => push(sourcesView) },
       { label: "Réglages", icon: "sliders", onSelect: () => push(settingsRootView) },
+      { label: "Retour vers webOS", icon: "home", onSelect: backToWebos },
     ];
-    return { kind: "grid", name: "home", rows: [{ kind: "top", entries: topButtons }, { kind: "apps", role: "channels", entries: channelEntries() }, { kind: "apps", role: "apps", entries: appEntries(), loading: apps === null }], start: { row: 2, col: 0 } };
+    return { kind: "grid", name: "home", rows: [{ kind: "top", entries: topButtons }, { kind: "avatars", entries: avatarEntries() }, { kind: "apps", entries: appEntries(), loading: apps === null }], start: { row: 2, col: 0 } };
   }
 
   function sourcesView() {
@@ -574,10 +574,21 @@ export function render(root, catalog, env) {
     return { kind: "list", title: "Applications", preview: { icon: "apps", text: "Choisissez les apps affichées sur l'écran d'accueil." }, rows };
   }
 
+  function homeRedirectOn() { return !!(limitState && limitState.config && limitState.config.home_redirect); }
+
+  function toggleHomeRedirect() {
+    if (!limitState) { say("Service ApOS injoignable : réglage impossible"); return; }
+    api.post("/home", { enabled: !homeRedirectOn() }).then((res) => {
+      if (res.status !== 200) { say("Réglage impossible"); return; }
+      return refreshLimits().then(show);
+    });
+  }
+
   function systemView() {
     const rows = [
       { label: "Paramètres LG", chevron: true, icon: "system", desc: "Ouvre les réglages officiels de la TV (image, son, réseau…).", onSelect: launchEntry("com.palm.app.settings") },
       { label: "Accueil LG", chevron: true, icon: "home", desc: "Ouvre l'écran d'accueil d'origine de la TV.", onSelect: launchEntry("com.webos.app.home") },
+      { label: "Bouton Home de la télécommande", value: homeRedirectOn() ? "ApOS" : "webOS", icon: "home", desc: "Choisit ce que le bouton Home ouvre : ApOS (la redirection vérifie l'accueil LG chaque seconde) ou l'accueil LG d'origine. « Retour vers webOS » reste en haut de l'accueil.", onSelect: toggleHomeRedirect },
       { label: "Recharger ApOS", icon: "system", desc: "Relance l'interface d'ApOS.", onSelect: () => window.location.reload() },
       { label: "À propos", value: "ApOS " + (appVersion || ""), icon: "system", desc: allApps().length + " apps, " + wallpapers.length + " fonds d'écran. Aucune donnée n'est envoyée sur Internet." },
     ];
@@ -640,10 +651,10 @@ export function render(root, catalog, env) {
     dom.rows.forEach((r, ri) => {
       r.tiles.forEach((t, c) => {
         const focused = ri === pos.row && c === pos.col;
-        t.classList.toggle(r.kind === "top" ? "topbtn--focused" : "tile--focused", focused);
-        if (r.kind !== "top") t.classList.toggle("tile--lifted", reordering && focused);
+        t.classList.toggle(r.kind === "top" ? "topbtn--focused" : (r.kind === "avatars" ? "avatar--focused" : "tile--focused"), focused);
+        if (r.kind === "apps") t.classList.toggle("tile--lifted", reordering && focused);
       });
-      if (r.kind !== "top") {
+      if (r.kind === "apps") {
         // Au-delà de la dernière tuile entièrement visible, on décale d'une marge de plus : la tuile précédente
         // disparaît et un bout de la suivante reste visible. Sans cela, la tuile active agrandie serait rognée au bord.
         const offset = ri === pos.row && pos.col >= metrics.visible ? (pos.col - (metrics.visible - 1)) * metrics.step + 42 : 0;
@@ -660,7 +671,11 @@ export function render(root, catalog, env) {
       node.onmousemove = (ev) => { if (!(ev.movementX || ev.movementY)) return; const p = grid.position; if (p.row !== ri || p.col !== c) { grid.setPosition(ri, c); top().pos = grid.position; paintGrid(); } };
       node.onclick = () => { grid.setPosition(ri, c); top().pos = grid.position; selectCurrent(); };
     };
+    Object.keys(avatars).forEach((id) => avatars[id].box.classList.remove("avatar--focused"));
     const rows = view.rows.map((r, ri) => {
+      if (r.kind === "avatars") {
+        return { kind: "avatars", tiles: r.entries.map((e) => avatars[e.id].box) };
+      }
       if (r.kind === "top") {
         const wrap = el("div", "topbtns");
         const tiles = r.entries.map((e, c) => { const b = el("div", "topbtn"); b.appendChild(svgSpan(e.icon, "topbtn__icon")); wrap.appendChild(b); pointer(b, ri, c); return b; });

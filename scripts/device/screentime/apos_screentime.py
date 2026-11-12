@@ -5,7 +5,9 @@
   au premier plan dans data/usage-AAAA-MM-JJ.log (« HH:MM:SS idApp »). Les jours passés sont résumés en .tsv.
 - Limites : limite quotidienne et limites par app. À la limite : un message (toast) ou un verrouillage
   (ApOS est ramené au premier plan et affiche un écran de code PIN). Le code PIN prolonge d'une durée choisie.
-- API locale : http://127.0.0.1:8742 (GET /state, POST /config /pin /verify /unlock /ack /update/check /update/install), réservée à la TV.
+- Bouton Home : si l'option est active, quand l'accueil LG passe au premier plan, ApOS est relancé (vérification chaque seconde).
+  « Retour vers webOS » ouvre l'accueil LG sans redirection ; garde-fou contre les boucles (pause de 10 min après 5 redirections en 30 s).
+- API locale : http://127.0.0.1:8742 (GET /state, POST /config /pin /verify /unlock /ack /home /home/lg /update/check /update/install), réservée à la TV.
 Aucune donnée ne quitte la TV ; seule exception : la vérification de mise à jour demandée par l'utilisateur
 (téléchargement depuis le dépôt GitHub d'ApOS, rien n'est envoyé).
 """
@@ -27,12 +29,18 @@ APOS_ID = "com.apos.launcher"
 PORT = 8742
 SAFE_ID = re.compile(r"^[A-Za-z0-9._-]+$")
 PIN_FORMAT = re.compile(r"^[0-9]{4,8}$")
-DEFAULT_CONFIG = {"daily_limit": 0, "app_limits": {}, "action": "message", "extension": 1800, "pin_salt": "", "pin_hash": ""}
+DEFAULT_CONFIG = {"home_redirect": False, "daily_limit": 0, "app_limits": {}, "action": "message", "extension": 1800, "pin_salt": "", "pin_hash": ""}
 EXTENSIONS = (900, 1800, 3600)
 MAX_PIN_FAILURES = 5
 PIN_LOCKOUT_SECONDS = 60
 TOAST_INTERVAL_SECONDS = 300
 RELAUNCH_MIN_SECONDS = 5
+LG_HOME_ID = "com.webos.app.home"
+HOME_PASS_SECONDS = 20
+HOME_RELAUNCH_MIN_SECONDS = 3
+HOME_LOOP_MAX = 5
+HOME_LOOP_WINDOW_SECONDS = 30
+HOME_PAUSE_SECONDS = 600
 PBKDF2_ROUNDS = 50000
 ASSET_PATHS = ("assets/wallpapers", "assets/icons", "config/launchpoints.json")
 RESTORE_EVERY_SECONDS = 60
@@ -154,6 +162,8 @@ def sanitize_config(raw):
             ok = seconds(value, 10, 86400)
             if isinstance(app_id, str) and SAFE_ID.match(app_id) and ok is not None:
                 cfg["app_limits"][app_id] = ok
+    if isinstance(raw.get("home_redirect"), bool):
+        cfg["home_redirect"] = raw["home_redirect"]
     if raw.get("action") in ("message", "lock"):
         cfg["action"] = raw["action"]
     if raw.get("extension") in EXTENSIONS:
@@ -220,6 +230,11 @@ class Service:
         self.pin_locked_until = None
         self.last_toast = None
         self.last_launch = None
+        self.home_pass = None
+        self.home_pass_until = None
+        self.home_last_launch = None
+        self.home_redirects = []
+        self.home_paused_until = None
         os.makedirs(data_dir, exist_ok=True)
         self.restore_data()
         self.restore_assets()
@@ -348,6 +363,53 @@ class Service:
                 f.write("%s %s\n" % (self.now().strftime("%H:%M:%S"), app))
             self.usage.add(app, self.interval)
             self._enforce()
+
+    # ---------- bouton Home ----------
+
+    def set_home(self, enabled):
+        if not isinstance(enabled, bool):
+            raise ValueError("booléen attendu")
+        with self.lock:
+            self.config["home_redirect"] = enabled
+            self.home_paused_until = None
+            self.home_redirects = []
+            self._save_config()
+
+    def open_lg_home(self):
+        """« Retour vers webOS » : ouvre l'accueil LG sans que la redirection le referme aussitôt."""
+        with self.lock:
+            self.home_pass = "pending"
+            self.home_pass_until = self.now() + timedelta(seconds=HOME_PASS_SECONDS)
+        self.luna("luna://com.webos.applicationManager/launch", {"id": LG_HOME_ID})
+
+    def home_tick(self):
+        with self.lock:
+            if not self.config["home_redirect"]:
+                return
+            now = self.now()
+            if self.home_paused_until is not None:
+                if now < self.home_paused_until:
+                    return
+                self.home_paused_until = None
+            app = (self.luna("luna://com.webos.applicationManager/getForegroundAppInfo", {}) or {}).get("appId") or ""
+            if app != LG_HOME_ID:
+                if self.home_pass == "in" or (self.home_pass == "pending" and now > self.home_pass_until):
+                    self.home_pass = None
+                return
+            if self.home_pass == "in" or (self.home_pass == "pending" and now <= self.home_pass_until):
+                self.home_pass = "in"
+                return
+            if self.home_last_launch is not None and (now - self.home_last_launch).total_seconds() < HOME_RELAUNCH_MIN_SECONDS:
+                return
+            self.home_redirects = [t for t in self.home_redirects if (now - t).total_seconds() < HOME_LOOP_WINDOW_SECONDS]
+            if len(self.home_redirects) >= HOME_LOOP_MAX:
+                self.home_paused_until = now + timedelta(seconds=HOME_PAUSE_SECONDS)
+                self.home_redirects = []
+                self.luna("luna://com.webos.notification/createToast", {"message": "ApOS : redirection du bouton Home suspendue 10 min (boucle détectée)"})
+                return
+            self.home_redirects.append(now)
+            self.home_last_launch = now
+            self.luna("luna://com.webos.applicationManager/launch", {"id": APOS_ID})
 
     # ---------- limites ----------
 
@@ -517,6 +579,12 @@ def make_server(service, host="127.0.0.1", port=PORT):
                     self._send(200, {"ok": service.verify(body.get("pin"))})
                 elif self.path == "/unlock":
                     self._send(200, {"ok": service.unlock(body.get("pin"))})
+                elif self.path == "/home":
+                    service.set_home(body.get("enabled"))
+                    self._send(200, {"ok": True})
+                elif self.path == "/home/lg":
+                    service.open_lg_home()
+                    self._send(200, {"ok": True})
                 elif self.path == "/update/check" and service.updater:
                     self._send(200, service.updater.check())
                 elif self.path == "/update/install" and service.updater:
@@ -550,6 +618,15 @@ def main():
     service = Service(data_dir, config, luna, datetime.now, interval, app_dir=app_dir, persist_dir=persist, updater=updater)
     server = make_server(service)
     threading.Thread(target=server.serve_forever, daemon=True).start()
+    def home_loop():
+        while True:
+            try:
+                service.home_tick()
+            except Exception as err:
+                sys.stderr.write("home: %r\n" % (err,))
+            time.sleep(1)
+
+    threading.Thread(target=home_loop, daemon=True).start()
     last_restore = last_backup = time.time()
     while True:
         try:

@@ -26,7 +26,6 @@ export function lunaCall(uri, params, opts) {
   });
 }
 
-export function launchApp(id, opts, params) {
-  const body = params ? { id, params } : { id };
-  return lunaCall("luna://com.webos.applicationManager/launch", body, opts);
+export function launchApp(id, opts) {
+  return lunaCall("luna://com.webos.applicationManager/launch", { id }, opts);
 }

@@ -206,8 +206,5 @@ svg { display: block; width: 100%; height: 100%; }
 @keyframes avatar-chew { 0%, 100% { transform: scale(1, 1); } 50% { transform: scale(1.03, 0.97) translateY(1px); } }
 .reduce-motion .avatar__body, .reduce-motion .avatar__prop { animation: none !important; }
 
-/* ---------- widget : chaînes YouTube (au-dessus du dock des apps) ---------- */
-.dock--channels { bottom: 330px; }
-.dock__title { position: absolute; left: 42px; top: -44px; font-size: 26px; font-weight: 600; color: rgba(255, 255, 255, 0.85); text-shadow: 0 2px 8px rgba(0, 0, 0, 0.5); }
-.dock--channels .tile__label { opacity: 1; }
-.icons-neutral .dock--channels .tile__box { background: var(--tile-bg, rgba(40, 46, 66, 0.9)) !important; }
+/* ---------- avatars sélectionnables à la télécommande ---------- */
+.avatar--focused { transform: scale(1.12); border-radius: 28px; background: rgba(255, 255, 255, 0.2); box-shadow: 0 0 0 4px #fff, 0 18px 34px rgba(0, 0, 0, 0.4); }

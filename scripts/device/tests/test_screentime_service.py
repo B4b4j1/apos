@@ -499,3 +499,96 @@ def test_http_update_endpoints(tmp_path):
         assert luna.calls[-1][0].endswith("/dev/install")
     finally:
         server.shutdown()
+
+
+# ---------- bouton Home ----------
+
+def test_home_redirect_is_off_by_default_and_ignored_when_off():
+    with tempfile.TemporaryDirectory() as tmp:
+        svc, luna, _ = make(tmp, app="com.webos.app.home")
+        svc.home_tick()
+        assert luna.launched() == []
+
+
+def test_home_redirect_launches_apos_when_lg_home_appears():
+    with tempfile.TemporaryDirectory() as tmp:
+        svc, luna, clock = make(tmp, app="com.webos.app.home")
+        svc.set_home(True)
+        svc.home_tick()
+        assert luna.launched() == ["com.apos.launcher"]
+        svc.home_tick()  # toujours l'accueil LG une seconde plus tard : pas de second lancement immédiat
+        assert luna.launched() == ["com.apos.launcher"]
+        clock.advance(4)
+        svc.home_tick()
+        assert luna.launched() == ["com.apos.launcher", "com.apos.launcher"]
+
+
+def test_home_redirect_ignores_other_apps():
+    with tempfile.TemporaryDirectory() as tmp:
+        svc, luna, _ = make(tmp, app="netflix")
+        svc.set_home(True)
+        svc.home_tick()
+        assert luna.launched() == []
+
+
+def test_open_lg_home_suspends_redirect_until_leaving_lg_home():
+    with tempfile.TemporaryDirectory() as tmp:
+        svc, luna, clock = make(tmp, app="com.apos.launcher")
+        svc.set_home(True)
+        svc.open_lg_home()
+        assert luna.launched() == ["com.webos.app.home"]
+        luna.app = "com.webos.app.home"
+        clock.advance(2)
+        svc.home_tick()
+        clock.advance(60)
+        svc.home_tick()
+        assert luna.launched() == ["com.webos.app.home"]  # l'utilisateur reste sur l'accueil LG
+        luna.app = "netflix"
+        svc.home_tick()
+        luna.app = "com.webos.app.home"  # nouvel appui sur Home : redirection de nouveau active
+        clock.advance(5)
+        svc.home_tick()
+        assert luna.launched()[-1] == "com.apos.launcher"
+
+
+def test_open_lg_home_pass_expires_if_lg_home_never_shows():
+    with tempfile.TemporaryDirectory() as tmp:
+        svc, luna, clock = make(tmp, app="netflix")
+        svc.set_home(True)
+        svc.open_lg_home()
+        clock.advance(30)
+        svc.home_tick()
+        luna.app = "com.webos.app.home"
+        svc.home_tick()
+        assert luna.launched()[-1] == "com.apos.launcher"
+
+
+def test_home_redirect_pauses_after_a_loop():
+    with tempfile.TemporaryDirectory() as tmp:
+        svc, luna, clock = make(tmp, app="com.webos.app.home")
+        svc.set_home(True)
+        for _ in range(5):
+            svc.home_tick()
+            clock.advance(4)
+        n = len(luna.launched())
+        svc.home_tick()
+        assert len(luna.launched()) == n and luna.toasts()
+        clock.advance(60)
+        svc.home_tick()
+        assert len(luna.launched()) == n  # toujours en pause
+        clock.advance(600)
+        svc.home_tick()
+        assert len(luna.launched()) == n + 1
+
+
+def test_home_setting_persists_and_validates():
+    with tempfile.TemporaryDirectory() as tmp:
+        svc, _, _ = make(tmp)
+        svc.set_home(True)
+        assert json.load(open(os.path.join(tmp, "config.json")))["home_redirect"] is True
+        assert svc.state()["config"]["home_redirect"] is True
+        try:
+            svc.set_home("oui")
+            assert False
+        except ValueError:
+            pass
