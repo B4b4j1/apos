@@ -1,0 +1,1 @@
+# Domaines à ne jamais bloquer (fonctionnel). Compléter depuis docs/telemetry-audit.md.
