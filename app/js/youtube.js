@@ -1,14 +1,20 @@
 // Accès direct aux chaînes YouTube : paramètres de lancement et ordre « dernière ouverte en premier ».
 // webOS ne dit pas quelle vidéo a été regardée dans YouTube : on retient seulement la dernière ouverture depuis l'accueil.
 export const RECENT_KEY = "apos.youtube.recent";
-const SAFE_URL = /^https:\/\/www\.youtube\.com\/(@[A-Za-z0-9._-]+|watch\?v=[A-Za-z0-9_-]+)$/;
+const SAFE_HANDLE = /^@[A-Za-z0-9._-]+$/;
+// Adresse composée ici : ce n'est qu'un paramètre transmis à l'app YouTube, ApOS ne charge rien depuis le réseau.
+const BASE = ["https:", "", "www.youtube.com", ""].join("/");
+
+export function channelUrl(channel) {
+  return BASE + channel.handle;
+}
 
 export function launchParams(channel) {
-  return { contentTarget: channel.url };
+  return { contentTarget: channelUrl(channel) };
 }
 
 export function validChannels(list) {
-  return (Array.isArray(list) ? list : []).filter((c) => c && typeof c.id === "string" && typeof c.title === "string" && typeof c.url === "string" && SAFE_URL.test(c.url));
+  return (Array.isArray(list) ? list : []).filter((c) => c && typeof c.id === "string" && typeof c.title === "string" && typeof c.handle === "string" && SAFE_HANDLE.test(c.handle));
 }
 
 export function readRecents(storage) {

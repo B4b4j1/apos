@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { CHANNELS, YOUTUBE_APP_ID } from "../config/youtube.js";
-import { launchParams, validChannels, readRecents, markOpened, orderChannels, RECENT_KEY } from "../js/youtube.js";
+import { channelUrl, launchParams, validChannels, readRecents, markOpened, orderChannels, RECENT_KEY } from "../js/youtube.js";
 import { launchApp } from "../js/luna.js";
 
 function memory() {
@@ -11,7 +11,7 @@ function memory() {
 describe("youtube channels", () => {
   it("lists the three requested channels with safe direct links", () => {
     expect(YOUTUBE_APP_ID).toBe("youtube.leanback.v4");
-    expect(CHANNELS.map((c) => c.url)).toEqual([
+    expect(CHANNELS.map(channelUrl)).toEqual([
       "https://www.youtube.com/@3-kota",
       "https://www.youtube.com/@malyshariki",
       "https://www.youtube.com/@BlueyFrancais",
@@ -19,7 +19,7 @@ describe("youtube channels", () => {
     expect(validChannels(CHANNELS)).toHaveLength(3);
   });
   it("rejects other hosts and malformed entries", () => {
-    expect(validChannels([{ id: "x", title: "X", url: "https://evil.test/@x" }, null, { id: 1 }, { id: "y", title: "Y", url: "http://www.youtube.com/@y" }])).toEqual([]);
+    expect(validChannels([{ id: "x", title: "X", handle: "https://evil.test/@x" }, null, { id: 1 }, { id: "y", title: "Y", handle: "y" }])).toEqual([]);
     expect(validChannels(null)).toEqual([]);
   });
   it("builds launch params carrying the url", () => {
