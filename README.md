@@ -34,6 +34,12 @@ Projet personnel pour une TV LG webOS rootée. Trois couches : blocage DNS local
 - Réinstaller ApOS depuis un paquet efface le dossier `data/` (l'historique) ; `scripts/device/deploy-app.sh <ip-tv>` le conserve.
 - Fuseau horaire : `scripts/device/set-timezone.sh <ip-tv> [zone]` (Europe/Paris par défaut ; retour : `Etc/GMT-0`). Le jour du rapport change à minuit selon ce fuseau.
 
+## Chaînes YouTube (accès direct)
+
+Une rangée « Chaînes YouTube » s'affiche au-dessus des apps : chaque tuile ouvre directement une chaîne dans l'app YouTube de la TV
+(lancement de `youtube.leanback.v4` avec `contentTarget`). La liste se modifie dans `app/config/youtube.js`.
+La dernière chaîne ouverte depuis l'accueil passe en premier ; webOS ne permet pas de savoir quelle vidéo a été regardée dans YouTube.
+
 ## Compagnons (avatars)
 Trois petits personnages côte à côte en haut à droite de l'accueil (`app/js/avatar.js`, réglage Apparence > Compagnons : tous les trois, un seul ou aucun) : un chat, une licorne et un lapin. Ils réagissent au lancement d'une app (contents), à l'entrée dans les réglages (curieux), à la réorganisation (surpris, ils sautent), à un réglage enregistré ou une mise à jour (fiers). Ils dorment (couchés) la nuit (22 h à 7 h) ou après 3 minutes sans action, et s'inquiètent à partir de 80 % de la limite quotidienne ou à l'écran de blocage. Leurs yeux suivent le pointeur (souris, Magic Remote) : seules les pupilles bougent, pas l'avatar ; elles reviennent au centre après 6 s d'immobilité.
 

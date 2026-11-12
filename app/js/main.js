@@ -5,6 +5,8 @@ import { keyAction } from "./keys.js";
 import { WALLPAPERS } from "../config/wallpapers.js";
 import { FALLBACK_APPS } from "../config/fallback-apps.js";
 import { SOURCES } from "../config/sources.js";
+import { CHANNELS, YOUTUBE_APP_ID } from "../config/youtube.js";
+import { launchParams, validChannels, readRecents, markOpened, orderChannels } from "./youtube.js";
 import { validWallpapers, readChoice, saveChoice, resolveMode, SLIDESHOW_ID } from "./wallpaper.js";
 import { createSlideshow } from "./slideshow.js";
 import { applyOrder, moveId, readOrder, saveOrder } from "./order.js";
@@ -57,6 +59,7 @@ function buildTile(entry, colorize) {
   } else if (entry.svg) {
     box.appendChild(svgSpan(entry.svg, "tile__glyph"));
   } else {
+    if (entry.color) { box.style.background = entry.color; box.style.setProperty("--tile-bg", entry.color); }
     box.appendChild(el("div", "tile__monogram", entry.monogram || entry.label.charAt(0).toUpperCase()));
   }
   if (entry.badge) box.appendChild(el("div", "tile__badge", "✓"));
@@ -468,6 +471,20 @@ export function render(root, catalog, env) {
     return () => { avatarEvent("launch"); return launch(id).catch((err) => say("Lancement impossible : " + err.message)); };
   }
 
+  function channelEntries() {
+    return orderChannels(validChannels(CHANNELS), readRecents(storage)).map((c) => ({
+      id: c.id,
+      label: c.title,
+      monogram: c.monogram,
+      color: c.color,
+      onSelect: () => {
+        avatarEvent("launch");
+        markOpened(storage, c.id, Date.now());
+        return launch(YOUTUBE_APP_ID, launchParams(c)).catch((err) => say("Lancement impossible : " + err.message));
+      },
+    }));
+  }
+
   function appEntries() {
     return filterHidden(allApps(), hidden).map((a) => ({
       id: a.id,
@@ -487,7 +504,7 @@ export function render(root, catalog, env) {
       { label: "Sources", icon: "sources", onSelect: () => push(sourcesView) },
       { label: "Réglages", icon: "sliders", onSelect: () => push(settingsRootView) },
     ];
-    return { kind: "grid", name: "home", rows: [{ kind: "top", entries: topButtons }, { kind: "apps", entries: appEntries(), loading: apps === null }], start: { row: 1, col: 0 } };
+    return { kind: "grid", name: "home", rows: [{ kind: "top", entries: topButtons }, { kind: "apps", role: "channels", entries: channelEntries() }, { kind: "apps", role: "apps", entries: appEntries(), loading: apps === null }], start: { row: 2, col: 0 } };
   }
 
   function sourcesView() {
@@ -650,7 +667,8 @@ export function render(root, catalog, env) {
         scr.appendChild(wrap);
         return { kind: "top", tiles };
       }
-      const dock = el("div", "dock");
+      const dock = el("div", "dock" + (r.role === "channels" ? " dock--channels" : ""));
+      if (r.role === "channels") dock.appendChild(el("div", "dock__title", "Chaînes YouTube"));
       const viewport = el("div", "row__viewport");
       const track = el("div", "row__track");
       const tiles = r.entries.map((e, c) => { const t = buildTile(e, !document.body.classList.contains("icons-neutral")); track.appendChild(t); pointer(t, ri, c); return t; });
@@ -814,7 +832,7 @@ export function render(root, catalog, env) {
   // ---------- réorganisation des tuiles ----------
 
   function enterReorder() {
-    if (!onHome() || grid.position.row !== 1 || view.rows[1].entries.length < 2) return false;
+    if (!onHome() || grid.position.row !== 2 || view.rows[2].entries.length < 2) return false;
     reordering = true;
     avatarEvent("reorder");
     say("Réorganisation : ◀ ▶ pour déplacer, OK pour valider");
@@ -829,7 +847,7 @@ export function render(root, catalog, env) {
   }
 
   function moveApp(dir) {
-    const ids = view.rows[1].entries.map((e) => e.id);
+    const ids = view.rows[2].entries.map((e) => e.id);
     const moved = moveId(ids, grid.position.col, dir === "left" ? -1 : 1);
     if (moved.index === grid.position.col) return;
     saveOrder(storage, moved.ids);
