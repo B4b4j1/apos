@@ -1019,3 +1019,16 @@ git commit -m "docs: add verification reports, recovery guide and README"
 2. Méthode de root utilisée (et version de l'outil), car elle conditionne les scripts des Tâches 4 et 8.
 3. Votre routeur permet-il un DNS local (dnsmasq, Pi-hole) ?
 4. Usage éducatif : enfants mineurs concernés ? (impacte les exigences RGPD ; le plan suppose déjà zéro collecte.)
+
+---
+
+## Mise à jour après recherche webosbrew.org (2026-11-12)
+
+Sources : /rooting, /develop/guides/with-root, /develop/guides/system-mods, /develop/guides/startup-script. Ces changements remplacent des hypothèses du plan initial.
+
+1. **Tâche 4 — désactivation des services.** Le plan utilisait `mv` dans `/usr/palm/services`, ce qui échoue sur un système en lecture seule. La méthode retenue est un *system mod* : `mount --bind` d'une configuration de remplacement sur le fichier ou le service visé, et un script de démarrage qui refait le montage à chaque boot. Annulation : `umount` puis suppression du script. Chaque service doit être traité individuellement après relevé (aucun exemple de désactivation n'est donné dans la documentation).
+2. **Tâche 8 — démarrage.** Le marqueur `/var/lib/apos/autostart-app` n'est pas un mécanisme webOS. Le mécanisme documenté est un lien symbolique dans `/var/lib/webosbrew/init.d/` (préfixe à deux chiffres, ex. `50-com.apos.launcher`). La commande de lancement de l'app au démarrage reste à vérifier sur la TV.
+3. **Tâche 3 — DNS.** La question du DNS local est ouverte. Une option sans routeur existe : bind-mount d'un `/etc/hosts` contenant la blocklist, sur la TV elle-même. Limite : elle ne bloque pas les connexions faites directement par IP ni le DNS chiffré si l'appareil l'utilise.
+4. **Méthode de root.** « slopbro » n'est pas nommée dans le guide `/rooting`. Les méthodes listées sont faultmanager, DejaVuln, WTA, crashd, RootMy.TV, GetMeNow et NVM. Le guide renvoie vers CanI.RootMy.TV pour vérifier la compatibilité du modèle et du firmware. Ce point doit être confirmé avant toute modification.
+5. **Sécurité du mode failsafe.** Si un script bloque le boot, la TV démarre un telnet root sans authentification pendant la récupération. Le script de démarrage doit être testé avant d'être activé.
+6. **RGPD.** Aucun mineur n'est concerné selon l'utilisateur ; le plan ne change pas.
