@@ -1,7 +1,7 @@
 # Découverte de l'appareil
 
 - Modèle : LG 43UR74006LB (fourni par l'utilisateur, à confirmer par `collect-info.sh`)
-- webOS : 10.3.2-33 (fourni par l'utilisateur, 2026-11-12 ; numéro de build « -33 » à comparer aux builds rootables)
+- webOS : « webOS25 / 10.3.2-33 » (relevé sur l'écran Informations de la TV, 2026-11-12) ; stockage interne 0,71 / 1,44 Go disponibles. Les identifiants matériels (MAC, ESN, Widevine) ne sont pas consignés dans le dépôt.
 - Méthode de root : « slopbro », via repo.webosbrew.org (fourni par l'utilisateur ; ce nom n'apparaît pas dans le guide webosbrew.org/rooting, à vérifier sur https://canirootmytv.com ou rootmy.tv avant toute manipulation)
 - Version de l'outil root : à relever
 - Version du firmware exacte (« Version du logiciel », à relever sur la TV) : à comparer à 13.40.90
